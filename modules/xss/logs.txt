@@ -10338,3 +10338,38 @@ Stacktrace:
 2025-10-21 02:12:23 [INFO] [32mAI analysis complete.[0m
 2025-10-21 02:12:23 [INFO] [33mAI detected: XSS (confidence: 0.5)[0m
 2025-10-21 02:12:23 [INFO] ::1 [21/Oct/2025:02:12:05 +0530] "POST /analyze_and_route HTTP/1.1" 200 6521 "http://localhost:8080/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+2025-10-21 02:14:21 [INFO] [36m
+    \u2554\u2550\u2557\u2554\u2550\u2557\u2554\u2557\u2554\u2554\u2557\u2554\u2566 \u2566\u2566 \u2566\u2566\u2554\u2550\u2557\u2554\u2550\u2557
+    \u2560\u2550\u255d\u2551\u2563 \u2551\u2551\u2551\u2551\u2551\u2551\u255a\u2566\u255d\u2551\u2551\u2551\u2551\u255a\u2550\u2557\u2551\u2563 
+    \u2569  \u255a\u2550\u255d\u255d\u255a\u255d\u255d\u255a\u255d \u2569 \u255a\u2569\u255d\u2569\u255a\u2550\u255d\u255a\u2550\u255d
+        [0m
+2025-10-21 02:14:21 [INFO] [36mInitializing Pennywise...[0m
+2025-10-21 02:14:21 [INFO] [36mLoading transformer components...[0m
+2025-10-21 02:14:21 [INFO] [33mSetting up transformer layers...[0m
+2025-10-21 02:14:21 [INFO] [33mApplying self-attention mechanisms...[0m
+2025-10-21 02:14:21 [INFO] [33mComputing transformer outputs...[0m
+2025-10-21 02:14:21 [INFO] [33mProcessing token embeddings...[0m
+2025-10-21 02:14:21 [INFO] [32mTransformer layers initialized.[0m
+2025-10-21 02:14:21 [INFO] [32mPennywise loaded successfully.[0m
+2025-10-21 02:14:21 [INFO] [35mSetting up HTTP endpoints...[0m
+2025-10-21 02:14:21 [INFO] [35mAdding route for index page...[0m
+2025-10-21 02:14:22 [INFO] [35mAdding route for vulnerability analysis...[0m
+2025-10-21 02:14:22 [INFO] [35mAdding route for site audit...[0m
+2025-10-21 02:14:22 [INFO] [35mAdding route for severity classification...[0m
+2025-10-21 02:14:22 [INFO] [35mAdding route for intelligent vulnerability detection...[0m
+2025-10-21 02:14:22 [INFO] [35mAdding route for confirmed scanning...[0m
+2025-10-21 02:14:23 [INFO] [35mAdding route for XSS scan pipeline...[0m
+2025-10-21 02:14:23 [INFO] [32mHTTP endpoints configured.[0m
+2025-10-21 02:14:23 [INFO] [34mInitializing web scraper components...[0m
+2025-10-21 02:14:23 [INFO] [34mConfiguring async event loop...[0m
+2025-10-21 02:14:23 [INFO] [32mStarting Pennywise HTTP Server on port 8080...[0m
+2025-10-21 02:14:28 [INFO] [36mStarting intelligent vulnerability detection pipeline...[0m
+2025-10-21 02:14:28 [INFO] [33mStep 1: Fetching and analyzing target site - https://juice-shop.herokuapp.com/#/login[0m
+2025-10-21 02:14:46 [INFO] [32mAI analysis complete.[0m
+2025-10-21 02:14:46 [INFO] [33mAI detected: XSS (confidence: 0.5)[0m
+2025-10-21 02:14:46 [INFO] ::1 [21/Oct/2025:02:14:28 +0530] "POST /analyze_and_route HTTP/1.1" 200 4395 "http://localhost:8080/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+2025-10-21 02:16:24 [INFO] [36mStarting intelligent vulnerability detection pipeline...[0m
+2025-10-21 02:16:24 [INFO] [33mStep 1: Fetching and analyzing target site - https://juice-shop.herokuapp.com/#/login[0m
+2025-10-21 02:16:39 [INFO] [32mAI analysis complete.[0m
+2025-10-21 02:16:39 [INFO] [33mAI detected: XSS (confidence: 0.5)[0m
+2025-10-21 02:16:39 [INFO] ::1 [21/Oct/2025:02:16:24 +0530] "POST /analyze_and_route HTTP/1.1" 200 3425 "http://localhost:8080/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
