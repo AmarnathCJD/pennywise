@@ -29,9 +29,7 @@ class LocalSecurityModel:
         """
         logger.info(colorama.Fore.CYAN + banner + colorama.Style.RESET_ALL)
         logger.info(colorama.Fore.CYAN + "Initializing Pennywise..." + colorama.Style.RESET_ALL)
-        time.sleep(0.5)
         logger.info(colorama.Fore.CYAN + "Loading transformer components..." + colorama.Style.RESET_ALL)
-        time.sleep(0.5)
         # from transformers import AutoTokenizer, AutoModelForCausalLM
         # Pretend these are transformer components
         # self.tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
@@ -42,17 +40,13 @@ class LocalSecurityModel:
 
     def _initialize_transformer_layers(self):
         logger.info(colorama.Fore.YELLOW + "Setting up transformer layers..." + colorama.Style.RESET_ALL)
-        time.sleep(0.3)
         self.attention_weights = [[i * j for j in range(10)] for i in range(10)]
         self.positional_embeddings = [sum(row) for row in self.attention_weights]
         logger.info(colorama.Fore.YELLOW + "Applying self-attention mechanisms..." + colorama.Style.RESET_ALL)
-        time.sleep(0.3)
         self._apply_self_attention()
         logger.info(colorama.Fore.YELLOW + "Computing transformer outputs..." + colorama.Style.RESET_ALL)
-        time.sleep(0.3)
         self._compute_transformer_output(5)
         logger.info(colorama.Fore.YELLOW + "Processing token embeddings..." + colorama.Style.RESET_ALL)
-        time.sleep(0.3)
         self._process_token_embeddings([])
         logger.info(colorama.Fore.GREEN + "Transformer layers initialized." + colorama.Style.RESET_ALL)
 
@@ -77,7 +71,12 @@ class LocalSecurityModel:
         return result
 
     def _call_cli(self, mode, data):
-        cmd = [self.binary, mode, json.dumps(data)]
+        import tempfile
+        # Write JSON data to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp:
+            json.dump(data, tmp)
+            tmp_path = tmp.name
+        cmd = [self.binary, mode, tmp_path]
         result = subprocess.run(cmd, capture_output=True, text=True)
         try:
             resp = json.loads(result.stdout.replace('```json\n', '').replace('\n```', '').strip())
@@ -121,7 +120,7 @@ async def analyze_and_route_handler(request):
     
     try:
         logger.info(colorama.Fore.YELLOW + f"Step 1: Fetching and analyzing target site - {url}" + colorama.Style.RESET_ALL)
-        time.sleep(0.3)
+        await asyncio.sleep(0.1)
         
         # Fetch HTML
         scraper = AsyncWebScraper()
@@ -135,29 +134,44 @@ async def analyze_and_route_handler(request):
         ai_analysis = model.site_audit(site_audit_data)
         
         logger.info(colorama.Fore.GREEN + "AI analysis complete." + colorama.Style.RESET_ALL)
-        
-        # Extract vulnerability type from AI response
+    # Extract vulnerability type and confidence from AI response
         vuln_type = ai_analysis.get("vulnerability_type", "XSS").upper()
         confidence = ai_analysis.get("confidence", 0.5)
-        
+        recommended_tests = ai_analysis.get("recommended_tests", [])
+        site_summary = ai_analysis.get("site_summary", "")
+
         # Default to XSS if unknown or not recognized
         if vuln_type.upper() not in ["XSS", "SQLI", "SQLi", "SQL"]:
             vuln_type = "XSS"
-        
+
         # Normalize to uppercase
         if vuln_type.upper() in ["SQLI", "SQL"]:
             vuln_type = "SQLI"
         else:
             vuln_type = "XSS"
-        
+
         logger.info(colorama.Fore.YELLOW + f"AI detected: {vuln_type} (confidence: {confidence})" + colorama.Style.RESET_ALL)
-        
-        # Generate professional technical summary
-        technical_summary = f"""Preliminary assessment identified potential {vuln_type} vectors in the target application.
-Analysis reveals user-supplied inputs with insufficient sanitization and validation mechanisms.
-Recommend initiating {vuln_type} testing to verify exploitability and determine impact scope.
-Confidence level: {int(confidence*100)}%"""
-        
+
+        # Build technical summary dynamically
+        summary_lines = []
+        if site_summary:
+            summary_lines.append(f"Site summary: {site_summary}")
+        summary_lines.append(f"Preliminary assessment identified potential {vuln_type} vectors in the target application.")
+        if recommended_tests:
+            summary_lines.append("Recommended tests:")
+            for test in recommended_tests:
+                if isinstance(test, dict):
+                    test_name = test.get("test", "Unknown test")
+                    priority = test.get("priority", "Medium")
+                    reason = test.get("reason", "")
+                    summary_lines.append(f"- {test_name} (Priority: {priority}) - {reason}")
+                else:
+                    summary_lines.append(f"- {str(test)}")
+        summary_lines.append("Analysis reveals user-supplied inputs with insufficient sanitization and validation mechanisms.")
+        summary_lines.append(f"Recommend initiating {vuln_type} testing to verify exploitability and determine impact scope.")
+        summary_lines.append(f"Confidence level: {int(confidence*100)}%")
+        technical_summary = "\n".join(summary_lines)
+
         return web.json_response({
             "status": "analysis_complete",
             "url": url,
@@ -203,12 +217,12 @@ async def confirm_and_scan_handler(request):
             logger.info(colorama.Fore.CYAN + f"User confirmed XSS scan. Starting XSS scanner..." + colorama.Style.RESET_ALL)
             
             logger.info(colorama.Fore.YELLOW + "Step 1: Running XSS vulnerability scanner..." + colorama.Style.RESET_ALL)
-            time.sleep(0.3)
+            await asyncio.sleep(0.1)
             xss_findings = run_xss_scan(url)
             
             if xss_findings and len(xss_findings) > 0:
                 logger.info(colorama.Fore.YELLOW + f"Step 2: Found {len(xss_findings)} XSS vulnerabilities. Analyzing details..." + colorama.Style.RESET_ALL)
-                time.sleep(0.3)
+                await asyncio.sleep(0.1)
                 
                 vuln_data = {
                     "type": "XSS",
@@ -219,7 +233,7 @@ async def confirm_and_scan_handler(request):
                 vuln_analysis = model.analyze_vuln(vuln_data)
                 
                 logger.info(colorama.Fore.YELLOW + "Step 3: Classifying vulnerabilities by severity..." + colorama.Style.RESET_ALL)
-                time.sleep(0.3)
+                await asyncio.sleep(0.1)
                 
                 # Format vulnerabilities properly for classification
                 formatted_vulns = []

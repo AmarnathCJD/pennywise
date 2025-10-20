@@ -11,18 +11,15 @@ from selenium.common.exceptions import TimeoutException, NoAlertPresentException
 from urllib.parse import urlparse, urljoin, parse_qs, urlencode, urlunparse, ParseResult
 from bs4 import BeautifulSoup
 import collections
-import asyncio
+import time
 import re
 import os
 import requests
 import traceback
 import datetime
-import time as time_module
 import logging
 from http.cookies import SimpleCookie
 import json
-from concurrent.futures import ThreadPoolExecutor
-import aiohttp
 
 # --- Configuration ---
 # Set up logging
@@ -78,7 +75,7 @@ SPA_SITES = {
 MAX_PAGES = 50      # stop crawling after this many pages (reduced to be reasonable)
 MAX_DEPTH = 3        # max crawl link depth from seed
 REQUEST_TIMEOUT = 15  # Timeout for remote sites (increased for slower sites)
-WAIT_TIME = 0.5      # Reduced wait time for faster scanning
+WAIT_TIME = 2        # Time to wait for JavaScript-heavy sites to load
 DOM_RISK_PATTERNS = [
     "innerHTML", "outerHTML", "document.write", "document.writeln",
     "location.hash", "location.search", "eval(", "setAttribute(", "insertAdjacentHTML"
@@ -498,7 +495,7 @@ def scan_forms_selenium(url, driver, forms, screenshot_dir, screenshot_count):
             for payload in TEST_PAYLOADS:
                 try:
                     driver.get(url)
-                    # Removed sleep for faster execution
+                    time.sleep(0.2)  # Reduced delay for faster scanning
                     
                     # Find and fill form fields
                     form_elements = driver.find_elements(By.TAG_NAME, "form")
@@ -524,7 +521,7 @@ def scan_forms_selenium(url, driver, forms, screenshot_dir, screenshot_count):
                                 try:
                                     logging.info(f"Submitting form with payload: '{payload}' in field: '{field}'")
                                     form_el.submit()
-                                    # Removed sleep for faster execution
+                                    time.sleep(0.3)  # Reduced delay for faster scanning
                                     screenshot_path = os.path.join(screenshot_dir, f"form_{screenshot_count}.png")
                                     driver.save_screenshot(screenshot_path)
                                     logging.info(f"Saved screenshot to {screenshot_path}")
@@ -732,9 +729,8 @@ def crawl_and_scan(start_url):
                 # Visit page with Selenium
                 driver.get(url)
                 
-                # Minimal wait for critical JavaScript only
-                if site_wait_time > 0.5:
-                    driver.implicitly_wait(0.5)  # Implicit wait instead of sleep
+                # Wait for JavaScript to load for modern web applications (reduced for speed)
+                time.sleep(0.3)  # Optimized delay for faster scanning
                 logging.info(f"Successfully loaded {url} in Selenium browser")
                 
                 # Take a screenshot
@@ -835,7 +831,7 @@ def crawl_and_scan(start_url):
                             try:
                                 logging.info(f"Testing parameter '{param}' with payload: '{payload}'")
                                 driver.get(test_url)
-                                # Removed sleep for faster execution
+                                time.sleep(0.2)  # Reduced delay for faster parameter testing
                                 
                                 # Take screenshot of the injected page
                                 screenshot_path = os.path.join(screenshot_dir, f"xss_test_{screenshot_count}.png")
@@ -873,7 +869,7 @@ def crawl_and_scan(start_url):
             seen.add(url)
             page_elapsed = time_module.time() - page_start_time
             logging.info(f"Completed scanning {url} in {page_elapsed:.1f}s, {len(summary_findings)} findings so far")
-            # Removed sleep for faster scanning
+            # Removed delay for faster scanning
     
     except Exception as e:
         print(f"General error: {e}")
@@ -1105,7 +1101,7 @@ def generate_html_report(categorized, filename="xss_report.html"):
 <body>
     <div class="header">
         <h1>PennyWise XSS Security Report</h1>
-        <p>Generated on: {time_module.strftime('%B %d, %Y')}</p>
+        <p>Generated on: {time.strftime('%B %d, %Y')}</p>
     </div>
 
     <div class="summary">

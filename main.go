@@ -24,7 +24,15 @@ func main() {
 	}
 
 	mode := os.Args[1]
-	input := os.Args[2]
+	inputFile := os.Args[2]
+
+	// Read JSON input from file
+	inputBytes, err := os.ReadFile(inputFile)
+	if err != nil {
+		fmt.Println("Error reading input file:", err)
+		return
+	}
+	input := string(inputBytes)
 
 	switch mode {
 	case "vuln-info":
@@ -95,11 +103,11 @@ func runSiteAudit(jsonInput string) {
 	}
 
 	prompt := fmt.Sprintf(`
-You are a penetration tester. (focus on sqli,xss, etc etc) Based on this website's content, return JSON output:
+You are a penetration tester. (focus on sqli,xss, etc etc) Based on this website's content which you think is vulnerable and attack focused dont gave blabbering info aboit the site like what intention they created like just focus on your aim, return JSON output:
 {
-  "site_summary": "Brief overview of what this site does",
-  "recommended_tests": [
-    {"test": "Test name", "priority": "High/Medium/Low", "reason": "Why this is important"}
+  "site_summary": "Brief overview of what this site does (very short and precise) (only specify vulnerable part)",
+  "recommended_tests": [ // what tests u recommend and why
+    {"test": "Test name", "priority": "High/Medium/Low", "reason": "Why this is important (keep it very short , precise, technical words, and simple)"}
   ],
   "next_steps": [0 -> if SQLi potential, 1-> if XSS potential, 2-> if auth issues, etc.]
 }
