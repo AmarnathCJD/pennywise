@@ -74,8 +74,12 @@ class PennywiseAPI:
     
     def _setup_routes(self):
         """Set up API routes."""
+        import os
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        static_dir = os.path.join(base_dir, 'webui', 'static')
+        
         self.app.router.add_get('/', self._handle_index)
-        self.app.router.add_static('/static', './static', show_index=True)
+        self.app.router.add_static('/static', static_dir, show_index=True)
         
         # Scan endpoints
         self.app.router.add_post('/api/scan', self._handle_scan)
@@ -97,6 +101,14 @@ class PennywiseAPI:
         self.app.router.add_post('/api/learning/train', self._handle_learning_train)
         self.app.router.add_get('/api/learning/recommend', self._handle_learning_recommend)
         
+        # Test local server endpoint
+        self.app.router.add_post('/api/test-local', self._handle_test_local)
+        self.app.router.add_get('/api/test-local/status', self._handle_test_local_status)
+        
+        # Streaming scan endpoints (SSE) - GET for EventSource
+        self.app.router.add_get('/api/scan/stream', self._handle_scan_stream)
+        self.app.router.add_get('/api/test-local/stream', self._handle_test_local_stream)
+        
         # Legacy endpoints (for compatibility)
         self.app.router.add_post('/analyze_vuln', self._handle_legacy_analyze_vuln)
         self.app.router.add_post('/site_audit', self._handle_legacy_site_audit)
@@ -105,8 +117,11 @@ class PennywiseAPI:
     
     async def _handle_index(self, request):
         """Serve the main page."""
-        return web.FileResponse('./index.html')
-    
+        import os
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        index_path = os.path.join(base_dir, 'webui', 'static', 'index.html')
+        return web.FileResponse(index_path)
+
     async def _handle_scan(self, request):
         """
         Start a full vulnerability scan.
@@ -470,6 +485,393 @@ class PennywiseAPI:
             ],
             'ready': self.learner.state.training_samples >= self.learner.min_samples
         })
+    
+    # Streaming Scan Endpoints (Server-Sent Events)
+    
+    async def _handle_scan_stream(self, request):
+        """
+        Stream scan results in real-time using Server-Sent Events.
+        Accepts GET with query params: url, attack_types (comma-separated), crawl
+        """
+        try:
+            # Get params from query string (GET) or JSON body (POST)
+            if request.method == 'GET':
+                url = request.query.get('url', '').strip()
+                attack_types_str = request.query.get('attack_types', '')
+                crawl = request.query.get('crawl', 'true').lower() == 'true'
+                attack_types_list = [t.strip() for t in attack_types_str.split(',') if t.strip()] if attack_types_str else []
+            else:
+                data = await request.json()
+                url = data.get('url', '').strip()
+                attack_types_list = data.get('attack_types', [])
+                crawl = data.get('crawl', True)
+            
+            if not url:
+                return web.json_response({'error': 'URL is required'}, status=400)
+            
+            attack_types = None
+            if attack_types_list:
+                attack_types = [
+                    AttackType(t.lower()) for t in attack_types_list
+                    if t.lower() in [at.value for at in AttackType]
+                ]
+            
+            # Create SSE response
+            response = web.StreamResponse(
+                status=200,
+                reason='OK',
+                headers={
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'Access-Control-Allow-Origin': '*'
+                }
+            )
+            await response.prepare(request)
+            
+            # Send start event
+            await self._send_sse(response, 'start', {
+                'message': f'Starting scan on {url}',
+                'target': url,
+                'attack_types': [at.value for at in attack_types] if attack_types else ['all']
+            })
+            
+            # Create a custom scanner with streaming callbacks
+            findings_list = []
+            pages_crawled = 0
+            requests_made = 0
+            start_time = datetime.now()
+            
+            async def on_finding(finding):
+                findings_list.append(finding)
+                await self._send_sse(response, 'finding', {
+                    'finding': {
+                        'title': finding.title,
+                        'severity': finding.severity.value if hasattr(finding.severity, 'value') else str(finding.severity),
+                        'attack_type': finding.attack_type.value if hasattr(finding.attack_type, 'value') else str(finding.attack_type),
+                        'url': finding.url,
+                        'parameter': finding.parameter,
+                        'evidence': finding.evidence[:300] if finding.evidence else None
+                    }
+                })
+            
+            async def on_progress(progress):
+                nonlocal pages_crawled, requests_made
+                phase = progress.current_phase if hasattr(progress, 'current_phase') else str(progress)
+                pages_crawled = progress.pages_crawled if hasattr(progress, 'pages_crawled') else pages_crawled
+                requests_made = progress.requests_made if hasattr(progress, 'requests_made') else requests_made
+                await self._send_sse(response, 'progress', {
+                    'phase': phase,
+                    'percent': int((progress.urls_tested / max(progress.total_urls, 1)) * 100) if hasattr(progress, 'urls_tested') else 0,
+                    'pages': pages_crawled,
+                    'requests': requests_made
+                })
+            
+            async def on_log(message, level):
+                await self._send_sse(response, 'log', {
+                    'message': message,
+                    'level': level
+                })
+            
+            # Create streaming scanner
+            from .core.enhanced_scanner import EnhancedScanner
+            streaming_scanner = EnhancedScanner(
+                config=self.config,
+                max_concurrent_requests=30,
+                on_finding=on_finding,
+                on_progress=on_progress,
+                on_log=on_log
+            )
+            
+            # Run scan
+            result = await streaming_scanner.scan(url=url, attack_types=attack_types, crawl=crawl, max_pages=50)
+            self.current_result = result
+            
+            # Send completion - handle dict result from EnhancedScanner
+            findings_list = result.get('findings', []) if isinstance(result, dict) else result.findings
+            severity_breakdown = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
+            for f in findings_list:
+                if isinstance(f, dict):
+                    sev = f.get('severity', 'info').lower()
+                else:
+                    sev = f.severity.value.lower() if hasattr(f.severity, 'value') else str(f.severity).lower()
+                if sev in severity_breakdown:
+                    severity_breakdown[sev] += 1
+            
+            pages = result.get('pages_scanned', 0) if isinstance(result, dict) else result.pages_crawled
+            requests = result.get('requests_made', 0) if isinstance(result, dict) else result.requests_made
+            duration = result.get('duration_seconds', 0) if isinstance(result, dict) else result.duration_seconds
+            
+            await self._send_sse(response, 'complete', {
+                'result': {
+                    'pages_scanned': pages,
+                    'requests_made': requests,
+                    'scan_duration': duration,
+                    'total_findings': len(findings_list)
+                },
+                'severity_breakdown': severity_breakdown
+            })
+            
+            await response.write_eof()
+            return response
+            
+        except Exception as e:
+            self.logger.error(f"Stream scan failed: {e}")
+            if 'response' in locals():
+                await self._send_sse(response, 'error', {'error': str(e)})
+                await response.write_eof()
+                return response
+            return web.json_response({'error': str(e)}, status=500)
+    
+    async def _handle_test_local_stream(self, request):
+        """
+        Stream test scan results against local vulnerable server.
+        Accepts GET with query params: port, attack_types (comma-separated)
+        """
+        try:
+            # Get params from query string (GET) or JSON body (POST)
+            if request.method == 'GET':
+                port = int(request.query.get('port', '8888'))
+                attack_types_str = request.query.get('attack_types', '')
+                attack_types_list = [t.strip() for t in attack_types_str.split(',') if t.strip()] if attack_types_str else []
+            else:
+                try:
+                    data = await request.json()
+                except:
+                    data = {}
+                port = data.get('port', 8888)
+                attack_types_list = data.get('attack_types', [])
+            
+            target_url = f"http://localhost:{port}"
+            
+            attack_types = None
+            if attack_types_list:
+                attack_types = [
+                    AttackType(t.lower()) for t in attack_types_list
+                    if t.lower() in [at.value for at in AttackType]
+                ]
+            
+            # Create SSE response
+            response = web.StreamResponse(
+                status=200,
+                reason='OK',
+                headers={
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'Access-Control-Allow-Origin': '*'
+                }
+            )
+            await response.prepare(request)
+            
+            # Use sandbox path for local testing
+            sandbox_url = f"{target_url}/sandbox"
+            
+            # Send start event
+            await self._send_sse(response, 'start', {
+                'message': f'Starting test scan on {sandbox_url}',
+                'target': sandbox_url
+            })
+            
+            findings_list = []
+            pages_count = 0
+            requests_count = 0
+            
+            async def on_finding(finding):
+                findings_list.append(finding)
+                await self._send_sse(response, 'finding', {
+                    'finding': {
+                        'title': finding.title,
+                        'severity': finding.severity.value if hasattr(finding.severity, 'value') else str(finding.severity),
+                        'attack_type': finding.attack_type.value if hasattr(finding.attack_type, 'value') else str(finding.attack_type),
+                        'url': finding.url,
+                        'parameter': finding.parameter,
+                        'evidence': finding.evidence[:300] if finding.evidence else None
+                    }
+                })
+            
+            async def on_progress(progress):
+                nonlocal pages_count, requests_count
+                phase = progress.current_phase if hasattr(progress, 'current_phase') else str(progress)
+                pages_count = progress.pages_crawled if hasattr(progress, 'pages_crawled') else pages_count
+                requests_count = progress.requests_made if hasattr(progress, 'requests_made') else requests_count
+                await self._send_sse(response, 'progress', {
+                    'phase': phase,
+                    'percent': int((progress.urls_tested / max(progress.total_urls, 1)) * 100) if hasattr(progress, 'urls_tested') else 0,
+                    'pages': pages_count,
+                    'requests': requests_count
+                })
+            
+            async def on_log(message, level):
+                await self._send_sse(response, 'log', {
+                    'message': message,
+                    'level': level
+                })
+            
+            # Create streaming scanner
+            from .core.enhanced_scanner import EnhancedScanner
+            streaming_scanner = EnhancedScanner(
+                config=self.config,
+                max_concurrent_requests=30,
+                on_finding=on_finding,
+                on_progress=on_progress,
+                on_log=on_log
+            )
+            
+            # Run scan with sandbox path
+            result = await streaming_scanner.scan(url=sandbox_url, attack_types=attack_types, crawl=True, max_pages=30)
+            self.current_result = result
+            
+            # Send completion - handle dict result from EnhancedScanner
+            findings_list = result.get('findings', []) if isinstance(result, dict) else result.findings
+            severity_breakdown = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
+            for f in findings_list:
+                if isinstance(f, dict):
+                    sev = f.get('severity', 'info').lower()
+                else:
+                    sev = f.severity.value.lower() if hasattr(f.severity, 'value') else str(f.severity).lower()
+                if sev in severity_breakdown:
+                    severity_breakdown[sev] += 1
+            
+            pages = result.get('pages_scanned', 0) if isinstance(result, dict) else result.pages_crawled
+            requests = result.get('requests_made', 0) if isinstance(result, dict) else result.requests_made
+            duration = result.get('duration_seconds', 0) if isinstance(result, dict) else result.duration_seconds
+            
+            await self._send_sse(response, 'complete', {
+                'result': {
+                    'pages_scanned': pages,
+                    'requests_made': requests,
+                    'scan_duration': duration,
+                    'total_findings': len(findings_list)
+                },
+                'severity_breakdown': severity_breakdown
+            })
+            
+            await response.write_eof()
+            return response
+            
+        except Exception as e:
+            self.logger.error(f"Test stream failed: {e}")
+            if 'response' in locals():
+                await self._send_sse(response, 'error', {'error': str(e)})
+                await response.write_eof()
+                return response
+            return web.json_response({'error': str(e)}, status=500)
+    
+    async def _send_sse(self, response, event_type, data):
+        """Send a Server-Sent Event with type embedded in data."""
+        payload = {'type': event_type, **data}
+        event_data = f"data: {json.dumps(payload)}\n\n"
+        await response.write(event_data.encode('utf-8'))
+    
+    # Test Local Scanner Endpoints
+    
+    async def _handle_test_local(self, request):
+        """
+        Run scanner against local vulnerable test server.
+        
+        Request body (optional):
+        {
+            "port": 8888,  // vulnerable server port
+            "attack_types": ["xss", "sqli", "csrf"]  // optional
+        }
+        """
+        try:
+            try:
+                data = await request.json()
+            except:
+                data = {}
+            
+            port = data.get('port', 8888)
+            target_url = f"http://localhost:{port}"
+            
+            # Parse attack types
+            attack_types = None
+            if 'attack_types' in data:
+                attack_types = [
+                    AttackType(t.lower()) for t in data['attack_types']
+                    if t.lower() in [at.value for at in AttackType]
+                ]
+            
+            # Store test scan status
+            self._test_scan_status = {
+                'running': True,
+                'progress': 0,
+                'current_phase': 'Starting',
+                'findings_count': 0,
+                'start_time': datetime.now().isoformat()
+            }
+            
+            self.logger.step(1, f"Starting test scan against {target_url}")
+            
+            # Run the scan
+            result = await self.scanner.scan(
+                url=target_url,
+                attack_types=attack_types,
+                crawl=True
+            )
+            
+            self.current_result = result
+            
+            # Update status
+            self._test_scan_status = {
+                'running': False,
+                'progress': 100,
+                'current_phase': 'Complete',
+                'findings_count': len(result.findings),
+                'end_time': datetime.now().isoformat()
+            }
+            
+            # Format findings by type
+            findings_by_type = {}
+            for finding in result.findings:
+                attack_type = finding.attack_type.value if hasattr(finding.attack_type, 'value') else str(finding.attack_type)
+                if attack_type not in findings_by_type:
+                    findings_by_type[attack_type] = []
+                findings_by_type[attack_type].append({
+                    'title': finding.title,
+                    'severity': finding.severity.value if hasattr(finding.severity, 'value') else str(finding.severity),
+                    'url': finding.url,
+                    'evidence': finding.evidence[:200] if finding.evidence else None,
+                    'parameter': finding.parameter
+                })
+            
+            # Calculate severity breakdown
+            severity_breakdown = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
+            for finding in result.findings:
+                sev = finding.severity.value.lower() if hasattr(finding.severity, 'value') else str(finding.severity).lower()
+                if sev in severity_breakdown:
+                    severity_breakdown[sev] += 1
+            
+            return web.json_response({
+                'success': True,
+                'target': target_url,
+                'summary': {
+                    'total_findings': len(result.findings),
+                    'pages_crawled': result.pages_crawled,
+                    'requests_made': result.requests_made,
+                    'duration_seconds': result.duration_seconds
+                },
+                'findings_by_type': findings_by_type,
+                'severity_breakdown': severity_breakdown,
+                'findings': [f.to_dict() for f in result.findings]
+            })
+            
+        except Exception as e:
+            self.logger.error(f"Test scan failed: {e}")
+            self._test_scan_status = {
+                'running': False,
+                'error': str(e)
+            }
+            return web.json_response(
+                {'error': str(e), 'success': False},
+                status=500
+            )
+    
+    async def _handle_test_local_status(self, request):
+        """Get the status of the current test scan."""
+        status = getattr(self, '_test_scan_status', {'running': False, 'message': 'No scan running'})
+        return web.json_response(status)
     
     # Legacy endpoint handlers for backward compatibility
     

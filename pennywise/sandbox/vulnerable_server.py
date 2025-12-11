@@ -176,7 +176,7 @@ TEMPLATES = {
 <!DOCTYPE html>
 <html>
 <head><title>Product Details</title>
-<style>body{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}.product{background:#16213e;padding:20px;border-radius:8px;}</style>
+<style>body{{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}}.product{{background:#16213e;padding:20px;border-radius:8px;}}</style>
 </head>
 <body>
     <h1>Product Details</h1>
@@ -195,7 +195,7 @@ TEMPLATES = {
 <!DOCTYPE html>
 <html>
 <head><title>Search Results</title>
-<style>body{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}.results{background:#16213e;padding:20px;border-radius:8px;}</style>
+<style>body{{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}}.results{{background:#16213e;padding:20px;border-radius:8px;}}</style>
 </head>
 <body>
     <h1>Search Results for: {query}</h1>
@@ -216,12 +216,12 @@ TEMPLATES = {
 <html>
 <head><title>Login</title>
 <style>
-body{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}
-.login-form{background:#16213e;padding:30px;border-radius:8px;max-width:400px;}
-input{display:block;margin:10px 0;padding:10px;width:100%;box-sizing:border-box;}
-button{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;}
-.error{color:#e94560;}
-.success{color:#00ff88;}
+body{{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}}
+.login-form{{background:#16213e;padding:30px;border-radius:8px;max-width:400px;}}
+input{{display:block;margin:10px 0;padding:10px;width:100%;box-sizing:border-box;}}
+button{{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;}}
+.error{{color:#e94560;}}
+.success{{color:#00ff88;}}
 </style>
 </head>
 <body>
@@ -244,7 +244,7 @@ button{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;}
 <!DOCTYPE html>
 <html>
 <head><title>Welcome</title>
-<style>body{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}</style>
+<style>body{{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}}</style>
 </head>
 <body>
     <h1>Welcome, {name}!</h1>
@@ -262,10 +262,10 @@ button{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;}
 <html>
 <head><title>Comments</title>
 <style>
-body{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}
-.comment{background:#16213e;padding:15px;margin:10px 0;border-radius:8px;}
-textarea{width:100%;padding:10px;height:100px;}
-button{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;margin-top:10px;}
+body{{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}}
+.comment{{background:#16213e;padding:15px;margin:10px 0;border-radius:8px;}}
+textarea{{width:100%;padding:10px;height:100px;}}
+button{{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;margin-top:10px;}}
 </style>
 </head>
 <body>
@@ -287,7 +287,7 @@ button{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;margin-to
 <!DOCTYPE html>
 <html>
 <head><title>DOM XSS Test</title>
-<style>body{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}</style>
+<style>body{{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}}</style>
 </head>
 <body>
     <h1>DOM-based XSS Test</h1>
@@ -320,11 +320,11 @@ button{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;margin-to
 <html>
 <head><title>Money Transfer</title>
 <style>
-body{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}
-.form{background:#16213e;padding:30px;border-radius:8px;max-width:400px;}
-input{display:block;margin:10px 0;padding:10px;width:100%;box-sizing:border-box;}
-button{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;}
-.success{color:#00ff88;background:#16213e;padding:15px;border-radius:8px;}
+body{{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}}
+.form{{background:#16213e;padding:30px;border-radius:8px;max-width:400px;}}
+input{{display:block;margin:10px 0;padding:10px;width:100%;box-sizing:border-box;}}
+button{{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;}}
+.success{{color:#00ff88;background:#16213e;padding:15px;border-radius:8px;}}
 </style>
 </head>
 <body>
@@ -348,10 +348,10 @@ button{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;}
 <html>
 <head><title>Auth Login</title>
 <style>
-body{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}
-.form{background:#16213e;padding:30px;border-radius:8px;max-width:400px;}
-input{display:block;margin:10px 0;padding:10px;width:100%;box-sizing:border-box;}
-button{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;}
+body{{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}}
+.form{{background:#16213e;padding:30px;border-radius:8px;max-width:400px;}}
+input{{display:block;margin:10px 0;padding:10px;width:100%;box-sizing:border-box;}}
+button{{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;}}
 </style>
 </head>
 <body>
@@ -374,7 +374,7 @@ button{padding:10px 20px;background:#00d4ff;border:none;cursor:pointer;}
 <!DOCTYPE html>
 <html>
 <head><title>User Profile</title>
-<style>body{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}.profile{background:#16213e;padding:20px;border-radius:8px;}</style>
+<style>body{{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}}.profile{{background:#16213e;padding:20px;border-radius:8px;}}</style>
 </head>
 <body>
     <h1>User Profile (IDOR Vulnerable)</h1>
@@ -600,7 +600,7 @@ async def auth_admin(request):
     <!DOCTYPE html>
     <html>
     <head><title>Admin Panel</title>
-    <style>body{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}</style>
+    <style>body{{font-family:Arial;margin:40px;background:#1a1a2e;color:#eee;}}</style>
     </head>
     <body>
         <h1>Admin Panel (Broken Access Control)</h1>

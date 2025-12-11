@@ -239,30 +239,50 @@ class EnhancedScanner:
         ]
     }
     
-    # SQL Error patterns
+    # SQL Error patterns - comprehensive detection
     SQL_ERROR_PATTERNS = [
+        # MySQL errors
         (r"SQL syntax.*MySQL", "MySQL"),
         (r"Warning.*mysql_", "MySQL"),
         (r"MySqlClient\.", "MySQL"),
+        (r"mysql_fetch", "MySQL"),
+        (r"mysql_num_rows", "MySQL"),
+        (r"MySQL.*error", "MySQL"),
+        # PostgreSQL errors
         (r"PostgreSQL.*ERROR", "PostgreSQL"),
         (r"Warning.*pg_", "PostgreSQL"),
         (r"valid PostgreSQL result", "PostgreSQL"),
         (r"Npgsql\.", "PostgreSQL"),
+        (r"PG::Error", "PostgreSQL"),
+        # MSSQL errors
         (r"Driver.* SQL[\-\_\ ]*Server", "MSSQL"),
         (r"OLE DB.* SQL Server", "MSSQL"),
         (r"\bSQL Server\b", "MSSQL"),
         (r"SQL Server.*Driver", "MSSQL"),
         (r"Warning.*mssql_", "MSSQL"),
         (r"Microsoft.*ODBC.*SQL", "MSSQL"),
+        # Oracle errors
         (r"ORA-\d{5}", "Oracle"),
         (r"Oracle.*Driver", "Oracle"),
         (r"Warning.*oci_", "Oracle"),
+        # SQLite errors - expanded patterns for test server
         (r"SQLite.*error", "SQLite"),
         (r"sqlite3\.OperationalError", "SQLite"),
         (r"SQLITE_ERROR", "SQLite"),
+        (r"sqlite3\.IntegrityError", "SQLite"),
+        (r"no such column", "SQLite"),
+        (r"no such table", "SQLite"),
+        (r"unrecognized token", "SQLite"),
+        (r"near \".*\": syntax error", "SQLite"),
+        (r"SQL Error:.*sqlite", "SQLite"),
+        (r"Database Error.*SQL", "SQLite"),
+        # Generic SQL errors
         (r"Unclosed quotation mark", "Generic SQL"),
         (r"quoted string not properly terminated", "Generic SQL"),
         (r"syntax error at or near", "Generic SQL"),
+        (r"SQL Error:", "Generic SQL"),
+        (r"Database Error", "Generic SQL"),
+        (r"Query:", "Generic SQL"),  # Error pages that show the query
     ]
     
     # Database enumeration payloads
@@ -479,7 +499,8 @@ class EnhancedScanner:
                             self._test_sqli(point) for point in injection_points
                         ])
                     elif attack_type == AttackType.CSRF:
-                        attack_tasks.append(self._test_csrf(target_info))
+                        # Test CSRF on ALL crawled pages, not just the main page
+                        attack_tasks.append(self._test_csrf_all_pages(pages_to_scan))
                     elif attack_type == AttackType.AUTH:
                         attack_tasks.append(self._test_auth(url, target_info))
                 
@@ -493,16 +514,22 @@ class EnhancedScanner:
                     elif isinstance(result, VulnerabilityFinding):
                         findings.append(result)
                 
-                # Phase 6: AI severity classification
+                # Phase 6: AI severity classification (with fallback)
                 self._update_progress("Classifying findings...", 90, 100)
                 for finding in findings:
-                    classification = self.ai_analyzer.classify_severity(finding.to_dict())
-                    finding.severity = SeverityLevel(classification.severity.lower())
-                    finding.cvss_score = classification.cvss_score
-                    
-                    # Get remediation suggestions
-                    remediations = self.ai_analyzer.suggest_remediation(finding.to_dict())
-                    finding.recommendations = [r.title for r in remediations[:3]]
+                    try:
+                        classification = self.ai_analyzer.classify_severity(finding.to_dict())
+                        if classification and classification.severity:
+                            finding.severity = SeverityLevel(classification.severity.lower())
+                            finding.cvss_score = classification.cvss_score or finding.cvss_score
+                        
+                        # Get remediation suggestions
+                        remediations = self.ai_analyzer.suggest_remediation(finding.to_dict())
+                        if remediations:
+                            finding.recommendations = [r.title for r in remediations[:3]]
+                    except Exception as e:
+                        logger.debug(f"AI classification error: {e}")
+                        # Keep existing severity from finding
                 
                 # Flush any remaining batched logs
                 if self._log_batch:
@@ -511,7 +538,15 @@ class EnhancedScanner:
                 
                 # Phase 7: Generate summary
                 self._update_progress("Generating report...", 95, 100)
-                summary = self.ai_analyzer.generate_summary([f.to_dict() for f in findings])
+                try:
+                    summary = self.ai_analyzer.generate_summary([f.to_dict() for f in findings])
+                except Exception as e:
+                    logger.debug(f"Summary generation error: {e}")
+                    summary = {
+                        'overall_risk': 'High' if findings else 'Low',
+                        'summary': f'Found {len(findings)} vulnerabilities',
+                        'recommendations': ['Review findings and implement fixes']
+                    }
                 
                 self._update_progress("Scan complete!", 100, 100)
                 self.progress.findings_count = len(findings)
@@ -708,6 +743,78 @@ class EnhancedScanner:
         
         self._log(f"Added {len(injection_points)} common API injection points", "info")
         return injection_points
+    
+    async def _test_single_xss_payload(self, url: str, param: str, payload: str, 
+                                        method: str = 'GET', is_api: bool = False) -> Optional[VulnerabilityFinding]:
+        """
+        Test a single XSS payload against an injection point.
+        
+        Returns a VulnerabilityFinding if XSS is detected, None otherwise.
+        """
+        try:
+            async with self._semaphore:
+                self.progress.requests_made += 1
+                self.progress.completed_tasks += 1
+                
+                if is_api and method == 'POST':
+                    # JSON API request
+                    json_data = {param: payload}
+                    headers = {'Content-Type': 'application/json'}
+                    async with self._session.post(url, json=json_data, headers=headers, 
+                                                   timeout=aiohttp.ClientTimeout(total=10)) as response:
+                        html = await response.text()
+                        status = response.status
+                        content_type = response.headers.get('Content-Type', '')
+                elif method == 'POST':
+                    # Form POST request
+                    data = {param: payload}
+                    async with self._session.post(url, data=data, 
+                                                   timeout=aiohttp.ClientTimeout(total=10)) as response:
+                        html = await response.text()
+                        status = response.status
+                        content_type = response.headers.get('Content-Type', '')
+                else:
+                    # GET request
+                    test_url = self._inject_into_url(url, param, payload)
+                    async with self._session.get(test_url, 
+                                                  timeout=aiohttp.ClientTimeout(total=10)) as response:
+                        html = await response.text()
+                        status = response.status
+                        content_type = response.headers.get('Content-Type', '')
+                
+                # Check if payload is reflected (unescaped)
+                is_json = 'json' in content_type.lower()
+                
+                if self._check_xss_reflection(html, payload, is_json):
+                    # Determine severity based on context
+                    severity = SeverityLevel.HIGH
+                    if '<script' in payload.lower() or 'onerror=' in payload.lower():
+                        severity = SeverityLevel.CRITICAL
+                    
+                    evidence = self._extract_evidence(html, payload, context=150)
+                    
+                    return self._create_finding(
+                        attack_type=AttackType.XSS,
+                        severity=severity,
+                        title=f"Reflected XSS in '{param}'",
+                        description=f"XSS payload is reflected unescaped in the response. "
+                                    f"This allows execution of arbitrary JavaScript in user browsers.",
+                        url=url,
+                        parameter=param,
+                        payload=payload,
+                        evidence=evidence,
+                        recommendations=[
+                            "Sanitize and encode all user input before rendering in HTML",
+                            "Implement Content-Security-Policy headers",
+                            "Use framework-provided auto-escaping (e.g., Jinja2, React)",
+                            "Validate input against a whitelist of allowed characters"
+                        ]
+                    )
+                
+        except Exception as e:
+            logger.debug(f"XSS test error for {url}/{param}: {e}")
+        
+        return None
     
     async def _test_xss(self, injection_point: Dict[str, Any]) -> List[VulnerabilityFinding]:
         """Test for XSS vulnerabilities."""
@@ -1004,6 +1111,46 @@ class EnhancedScanner:
             return "\\n".join(extracted_info[:20])  # Return up to 20 items
         return None
     
+    async def _test_csrf_all_pages(self, pages: List[str]) -> List[VulnerabilityFinding]:
+        """Test for CSRF vulnerabilities across all discovered pages."""
+        all_findings = []
+        tested_forms = set()  # Track tested form URLs to avoid duplicates
+        
+        self._log(f"Testing CSRF on {len(pages)} pages...", "info", force_flush=True)
+        
+        for page_url in pages:
+            try:
+                async with self._semaphore:
+                    async with self._session.get(page_url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                        self.progress.requests_made += 1
+                        html = await response.text()
+                        headers = dict(response.headers)
+                        
+                        target_info = {
+                            'url': page_url,
+                            'html': html,
+                            'headers': headers
+                        }
+                        
+                        findings = await self._test_csrf(target_info)
+                        
+                        # Filter out duplicates based on form URL
+                        for finding in findings:
+                            form_key = finding.url
+                            if form_key not in tested_forms:
+                                tested_forms.add(form_key)
+                                all_findings.append(finding)
+                                
+            except Exception as e:
+                logger.debug(f"CSRF test error for {page_url}: {e}")
+        
+        if all_findings:
+            self._log(f"Found {len(all_findings)} CSRF vulnerabilities!", "warning", force_flush=True)
+        else:
+            self._log(f"No CSRF vulnerabilities found in {len(pages)} pages", "info")
+        
+        return all_findings
+    
     async def _test_csrf(self, target_info: Dict[str, Any]) -> List[VulnerabilityFinding]:
         """Test for CSRF vulnerabilities."""
         findings = []
@@ -1159,37 +1306,66 @@ class EnhancedScanner:
         ))
     
     def _check_xss_reflection(self, html: str, payload: str, is_json: bool = False) -> bool:
-        """Check if XSS payload is reflected."""
-        # Direct reflection
+        """Check if XSS payload is reflected in an exploitable way."""
+        import html as html_lib
+        import urllib.parse
+        
+        # Normalize for comparison
+        html_lower = html.lower()
+        payload_lower = payload.lower()
+        
+        # Direct unescaped reflection - most dangerous
         if payload in html:
-            # Make sure it's not just in an encoded form
-            import html as html_lib
-            encoded = html_lib.escape(payload)
-            if encoded != payload and encoded in html and payload not in html:
-                return False
             return True
         
-        # Check for JSON escaped version
+        # Check for case-insensitive reflection
+        if payload_lower in html_lower:
+            return True
+        
+        # Check for dangerous patterns being reflected
+        # These are the key XSS indicators that must NOT be escaped
+        dangerous_patterns = [
+            ('<script', '</script>'),
+            ('onerror=', 'onerror='),
+            ('onload=', 'onload='),
+            ('onclick=', 'onclick='),
+            ('onfocus=', 'onfocus='),
+            ('onmouseover=', 'onmouseover='),
+            ('<img', 'src='),
+            ('<svg', 'onload='),
+            ('<iframe', 'src='),
+            ('javascript:', ''),
+            ('<body', 'onload='),
+        ]
+        
+        for pattern_start, pattern_check in dangerous_patterns:
+            if pattern_start in payload_lower:
+                # Check if this pattern appears unescaped in HTML
+                if pattern_start in html_lower:
+                    # Verify it's not HTML-escaped
+                    escaped_pattern = html_lib.escape(pattern_start)
+                    if escaped_pattern not in html and pattern_start in html_lower:
+                        return True
+        
+        # Check specifically for script tags being reflected
+        if '<script>' in payload_lower or '<script ' in payload_lower:
+            if '<script>' in html_lower or '<script ' in html_lower:
+                # Verify not escaped as &lt;script&gt;
+                if '&lt;script' not in html_lower:
+                    return True
+        
+        # Check for event handlers being reflected
+        event_handlers = ['onerror', 'onload', 'onclick', 'onfocus', 'onmouseover', 'onmouseout', 
+                         'onkeydown', 'onkeyup', 'onchange', 'onsubmit', 'ontoggle', 'onstart']
+        for handler in event_handlers:
+            if f'{handler}=' in payload_lower:
+                if f'{handler}=' in html_lower:
+                    return True
+        
+        # For JSON responses, check if HTML is reflected without JSON escaping
         if is_json:
-            json_escaped = payload.replace('"', '\\"').replace('<', '\\u003c').replace('>', '\\u003e')
-            if json_escaped != payload and json_escaped not in html:
-                # Payload is reflected unescaped in JSON
-                return True
-        
-        # Check for URL encoded reflection
-        import urllib.parse
-        encoded_payload = urllib.parse.quote(payload)
-        if encoded_payload in html:
-            return False  # Safely encoded
-        
-        # Check for HTML entity encoded reflection
-        if '&lt;' in html and '<' in payload:
-            return False  # Safely encoded
-        
-        # Check for partial reflection (dangerous patterns)
-        dangerous_patterns = ['<script', 'onerror=', 'onload=', 'javascript:', 'onclick=', 'onfocus=']
-        for pattern in dangerous_patterns:
-            if pattern in payload.lower() and pattern in html.lower():
+            # In JSON, < and > should be escaped as \u003c and \u003e
+            if '<' in payload and '<' in html and '\\u003c' not in html:
                 return True
         
         return False
@@ -1237,18 +1413,25 @@ class EnhancedScanner:
         }
     
     def _update_progress(self, phase: str, current: int, total: int):
-        """Update progress information."""
-        self.progress.current_phase = phase
-        logger.info(f"[{current}%] {phase}")
+        """Update progress information - throttled to prevent log spam."""
+        # Only log if phase changed (prevents duplicate messages)
+        if phase != self.progress.current_phase:
+            self.progress.current_phase = phase
+            logger.info(f"[{current}%] {phase}")
     
     def _report_progress(self):
         """Report current progress."""
         if self.on_progress:
-            self.on_progress(self.progress)
+            result = self.on_progress(self.progress)
+            if asyncio.iscoroutine(result):
+                asyncio.create_task(result)
     
     def _notify_finding(self, finding: VulnerabilityFinding):
         """Notify about a new finding."""
         self.progress.findings_count += 1
         logger.info(f"🔴 FOUND: {finding.title} ({finding.severity.value})")
         if self.on_finding:
-            self.on_finding(finding)
+            result = self.on_finding(finding)
+            if asyncio.iscoroutine(result):
+                asyncio.create_task(result)
+
