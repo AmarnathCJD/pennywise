@@ -12,24 +12,50 @@ import (
 	"google.golang.org/api/option"
 )
 
-const API_KEY = "AIzaSyBO36qGSZi_U3xPshX4w3XsDd1tBfbv8TA"
+// API key should be set via environment variable GEMINI_API_KEY
+// or in a config file. Never hardcode in production.
+func getAPIKey() string {
+	key := os.Getenv("GEMINI_API_KEY")
+	if key == "" {
+		// Fallback for development only - replace with your key or leave empty
+		key = os.Getenv("PENNYWISE_API_KEY")
+	}
+	return key
+}
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println(`Usage:
-  model-cli vuln-info '{"type":"SQLi", "subtype":"Error based", "url":"https://test", "match":"SELECT * FROM users"}'
-  model-cli site-audit '{"url":"https://mysite.com", "title":"Home", "html":"<html>...</html>"}'
-  model-cli classify-severity '{"summary":"XSS vuln", "details":"Stored XSS in login page"}'`)
+		fmt.Println(`PennyWise AI Model CLI
+======================
+
+Usage:
+  localmodel vuln-info <input.json>     Analyze a vulnerability
+  localmodel site-audit <input.json>    Audit a website for vulnerabilities
+  localmodel classify-severity <input.json>  Classify vulnerability severity
+
+Environment:
+  GEMINI_API_KEY   API key for Google Gemini (required)
+
+Examples:
+  localmodel vuln-info vuln_data.json
+  localmodel site-audit site_data.json
+  localmodel classify-severity findings.json`)
 		return
 	}
 
 	mode := os.Args[1]
+
+	if len(os.Args) < 3 {
+		fmt.Println(`{"error":"E004","message":"Input file required"}`)
+		return
+	}
+
 	inputFile := os.Args[2]
 
 	// Read JSON input from file
 	inputBytes, err := os.ReadFile(inputFile)
 	if err != nil {
-		fmt.Println("Error reading input file:", err)
+		fmt.Printf(`{"error":"E005","message":"Error reading input file: %s"}`, err.Error())
 		return
 	}
 	input := string(inputBytes)
@@ -42,30 +68,37 @@ func main() {
 	case "classify-severity":
 		runClassifier(input)
 	default:
-		fmt.Println("Unknown mode:", mode)
+		fmt.Printf(`{"error":"E006","message":"Unknown mode: %s"}`, mode)
 	}
 }
 
 func callGemini(prompt string) string {
+	apiKey := getAPIKey()
+	if apiKey == "" {
+		return `{"error":"E007","message":"GEMINI_API_KEY environment variable not set"}`
+	}
+
 	ctx := context0.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(API_KEY))
+	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		return `{"error":"E001","message":"API client init failed"}`
 	}
+	defer client.Close()
+
 	model := client.GenerativeModel("gemini-2.5-flash")
 
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
 		if strings.Contains(err.Error(), "quota") {
-			return `{"error":"E001"}`
+			return `{"error":"E001","message":"API quota exceeded"}`
 		} else if strings.Contains(err.Error(), "unsafe") {
-			return `{"error":"E002"}`
+			return `{"error":"E002","message":"Content blocked as unsafe"}`
 		}
-		return fmt.Sprintf(`{"message":"%s"}`, err.Error())
+		return fmt.Sprintf(`{"error":"E008","message":"%s"}`, err.Error())
 	}
 
 	if len(resp.Candidates) == 0 {
-		return `{"error":"E003"}`
+		return `{"error":"E003","message":"No response candidates"}`
 	}
 
 	part := resp.Candidates[0].Content.Parts[0]

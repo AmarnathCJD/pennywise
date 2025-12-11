@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PennyWise | Vulnerability Scanner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="logo-text">PennyWise</span>
+            </div>
+            <nav class="nav">
+                <a href="#" class="nav-link active" data-section="scanner">Scanner</a>
+                <a href="#" class="nav-link" data-section="reports">Reports</a>
+                <a href="#" class="nav-link" data-section="settings">Settings</a>
+            </nav>
+            <div class="header-actions">
+                <span class="status-indicator">
+                    <span class="status-dot"></span>
+                    Ready
+                </span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Scanner Section -->
+            <section id="scanner-section" class="section active">
+                <div class="section-header">
+                    <h1 class="section-title">Vulnerability Scanner</h1>
+                    <p class="section-subtitle">Analyze targets for security vulnerabilities using AI-powered detection</p>
+                </div>
+
+                <!-- Scan Configuration Card -->
+                <div class="card scan-config">
+                    <div class="card-header">
+                        <h2 class="card-title">Scan Configuration</h2>
+                    </div>
+                    <div class="card-body">
+                        <!-- Target Input -->
+                        <div class="form-group">
+                            <label class="form-label" for="target-url">Target URL</label>
+                            <div class="input-wrapper">
+                                <input 
+                                    type="url" 
+                                    id="target-url" 
+                                    class="form-input" 
+                                    placeholder="https://example.com"
+                                    autocomplete="off"
+                                >
+                                <button class="btn btn-icon" id="validate-url" title="Validate URL">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="20,6 9,17 4,12"></polyline>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Attack Types -->
+                        <div class="form-group">
+                            <label class="form-label">Attack Types</label>
+                            <div class="checkbox-grid">
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="attack" value="xss" checked>
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-label">
+                                        <span class="checkbox-title">XSS</span>
+                                        <span class="checkbox-desc">Cross-Site Scripting</span>
+                                    </span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="attack" value="sqli" checked>
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-label">
+                                        <span class="checkbox-title">SQLi</span>
+                                        <span class="checkbox-desc">SQL Injection</span>
+                                    </span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="attack" value="csrf">
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-label">
+                                        <span class="checkbox-title">CSRF</span>
+                                        <span class="checkbox-desc">Cross-Site Request Forgery</span>
+                                    </span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="attack" value="ssrf">
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-label">
+                                        <span class="checkbox-title">SSRF</span>
+                                        <span class="checkbox-desc">Server-Side Request Forgery</span>
+                                    </span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="attack" value="lfi">
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-label">
+                                        <span class="checkbox-title">LFI</span>
+                                        <span class="checkbox-desc">Local File Inclusion</span>
+                                    </span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="attack" value="auth">
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-label">
+                                        <span class="checkbox-title">Auth</span>
+                                        <span class="checkbox-desc">Authentication Bypass</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Scan Options -->
+                        <div class="form-group">
+                            <label class="form-label">Scan Options</label>
+                            <div class="options-row">
+                                <label class="toggle-item">
+                                    <input type="checkbox" id="opt-crawl" checked>
+                                    <span class="toggle-switch"></span>
+                                    <span class="toggle-label">Enable Crawling</span>
+                                </label>
+                                <label class="toggle-item">
+                                    <input type="checkbox" id="opt-ai">
+                                    <span class="toggle-switch"></span>
+                                    <span class="toggle-label">AI Analysis</span>
+                                </label>
+                                <label class="toggle-item">
+                                    <input type="checkbox" id="opt-parallel" checked>
+                                    <span class="toggle-switch"></span>
+                                    <span class="toggle-label">Parallel Scanning</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Concurrency Slider -->
+                        <div class="form-group">
+                            <label class="form-label">
+                                Concurrency Level
+                                <span class="form-value" id="concurrency-value">10</span>
+                            </label>
+                            <input type="range" id="concurrency" class="form-range" min="1" max="50" value="10">
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="form-actions">
+                            <button class="btn btn-primary btn-lg" id="start-scan">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="5,3 19,12 5,21"></polygon>
+                                </svg>
+                                Start Scan
+                            </button>
+                            <button class="btn btn-secondary" id="stop-scan" disabled>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="6" y="6" width="12" height="12"></rect>
+                                </svg>
+                                Stop
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Card -->
+                <div class="card progress-card hidden" id="progress-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Scan Progress</h2>
+                        <span class="scan-status" id="scan-status">Initializing...</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-stats">
+                            <div class="stat">
+                                <span class="stat-value" id="stat-requests">0</span>
+                                <span class="stat-label">Requests</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="stat-vulns">0</span>
+                                <span class="stat-label">Vulnerabilities</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="stat-time">0s</span>
+                                <span class="stat-label">Elapsed</span>
+                            </div>
+                        </div>
+                        <div class="log-container">
+                            <div class="log-header">
+                                <span>Live Log</span>
+                                <button class="btn btn-icon btn-sm" id="clear-log" title="Clear log">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3,6 5,6 21,6"></polyline>
+                                        <path d="M19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="log-content" id="log-content">
+                                <div class="log-entry log-info">Waiting for scan to start...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Card -->
+                <div class="card results-card hidden" id="results-card">
+                    <div class="card-header">
+                        <h2 class="card-title">Scan Results</h2>
+                        <div class="card-actions">
+                            <button class="btn btn-secondary btn-sm" id="export-json">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21,15v4a2,2 0 0,1-2,2H5a2,2 0 0,1-2-2v-4"></path>
+                                    <polyline points="7,10 12,15 17,10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Export JSON
+                            </button>
+                            <button class="btn btn-secondary btn-sm" id="export-html">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14,2H6a2,2 0 0,0-2,2v16a2,2 0 0,0,2,2h12a2,2 0 0,0,2-2V8Z"></path>
+                                    <polyline points="14,2 14,8 20,8"></polyline>
+                                </svg>
+                                Export HTML
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Summary Stats -->
+                        <div class="results-summary">
+                            <div class="summary-item critical">
+                                <span class="summary-count" id="count-critical">0</span>
+                                <span class="summary-label">Critical</span>
+                            </div>
+                            <div class="summary-item high">
+                                <span class="summary-count" id="count-high">0</span>
+                                <span class="summary-label">High</span>
+                            </div>
+                            <div class="summary-item medium">
+                                <span class="summary-count" id="count-medium">0</span>
+                                <span class="summary-label">Medium</span>
+                            </div>
+                            <div class="summary-item low">
+                                <span class="summary-count" id="count-low">0</span>
+                                <span class="summary-label">Low</span>
+                            </div>
+                            <div class="summary-item info">
+                                <span class="summary-count" id="count-info">0</span>
+                                <span class="summary-label">Info</span>
+                            </div>
+                        </div>
+
+                        <!-- Vulnerabilities Table -->
+                        <div class="table-container">
+                            <table class="results-table">
+                                <thead>
+                                    <tr>
+                                        <th>Severity</th>
+                                        <th>Type</th>
+                                        <th>Location</th>
+                                        <th>Details</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="results-table-body">
+                                    <!-- Results will be inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Reports Section -->
+            <section id="reports-section" class="section">
+                <div class="section-header">
+                    <h1 class="section-title">Scan Reports</h1>
+                    <p class="section-subtitle">View and manage your vulnerability scan reports</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="reports-list" id="reports-list">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M14,2H6a2,2 0 0,0-2,2v16a2,2 0 0,0,2,2h12a2,2 0 0,0,2-2V8Z"></path>
+                                    <polyline points="14,2 14,8 20,8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10,9 9,9 8,9"></polyline>
+                                </svg>
+                                <h3>No Reports Yet</h3>
+                                <p>Complete a scan to generate your first report</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settings-section" class="section">
+                <div class="section-header">
+                    <h1 class="section-title">Settings</h1>
+                    <p class="section-subtitle">Configure scanner behavior and preferences</p>
+                </div>
+
+                <div class="settings-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">General Settings</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="form-label" for="timeout">Request Timeout (seconds)</label>
+                                <input type="number" id="timeout" class="form-input" value="10" min="1" max="120">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="max-depth">Max Crawl Depth</label>
+                                <input type="number" id="max-depth" class="form-input" value="3" min="1" max="10">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="user-agent">User Agent</label>
+                                <input type="text" id="user-agent" class="form-input" value="PennyWise Security Scanner v1.0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">AI Configuration</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="form-label" for="ai-model">AI Model</label>
+                                <select id="ai-model" class="form-select">
+                                    <option value="local">Local Model (Qwen)</option>
+                                    <option value="gemini">Gemini API</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="api-key">API Key (if applicable)</label>
+                                <input type="password" id="api-key" class="form-input" placeholder="Enter your API key">
+                            </div>
+                            <label class="toggle-item">
+                                <input type="checkbox" id="ai-severity">
+                                <span class="toggle-switch"></span>
+                                <span class="toggle-label">AI-powered Severity Classification</span>
+                            </label>
+                            <label class="toggle-item">
+                                <input type="checkbox" id="ai-remediation">
+                                <span class="toggle-switch"></span>
+                                <span class="toggle-label">AI-powered Remediation Suggestions</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Payload Configuration</h2>
+                        </div>
+                        <div class="card-body">
+                            <label class="toggle-item">
+                                <input type="checkbox" id="payload-evasion">
+                                <span class="toggle-switch"></span>
+                                <span class="toggle-label">Enable WAF Evasion Payloads</span>
+                            </label>
+                            <label class="toggle-item">
+                                <input type="checkbox" id="payload-aggressive">
+                                <span class="toggle-switch"></span>
+                                <span class="toggle-label">Aggressive Mode (More Payloads)</span>
+                            </label>
+                            <label class="toggle-item">
+                                <input type="checkbox" id="time-based" checked>
+                                <span class="toggle-switch"></span>
+                                <span class="toggle-label">Time-based Detection</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Report Settings</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="form-label" for="report-format">Default Report Format</label>
+                                <select id="report-format" class="form-select">
+                                    <option value="json">JSON</option>
+                                    <option value="html">HTML</option>
+                                    <option value="pdf">PDF</option>
+                                </select>
+                            </div>
+                            <label class="toggle-item">
+                                <input type="checkbox" id="auto-save" checked>
+                                <span class="toggle-switch"></span>
+                                <span class="toggle-label">Auto-save Reports</span>
+                            </label>
+                            <label class="toggle-item">
+                                <input type="checkbox" id="include-evidence" checked>
+                                <span class="toggle-switch"></span>
+                                <span class="toggle-label">Include Evidence in Reports</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-primary" id="save-settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19,21H5a2,2 0 0,1-2-2V5a2,2 0 0,1,2-2h11l5,5v11a2,2 0 0,1-2,2Z"></path>
+                            <polyline points="17,21 17,13 7,13 7,21"></polyline>
+                            <polyline points="7,3 7,8 15,8"></polyline>
+                        </svg>
+                        Save Settings
+                    </button>
+                    <button class="btn btn-secondary" id="reset-settings">
+                        Reset to Defaults
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Vulnerability Detail Modal -->
+        <div class="modal" id="vuln-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">Vulnerability Details</h3>
+                    <button class="btn btn-icon modal-close" id="close-modal">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body" id="modal-body">
+                    <!-- Content will be dynamically inserted -->
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="copy-payload">Copy Payload</button>
+                    <button class="btn btn-primary" id="view-remediation">View Remediation</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification Container -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
