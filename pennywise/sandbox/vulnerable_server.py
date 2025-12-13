@@ -772,5 +772,35 @@ async def run_sandbox_server(host: str = '127.0.0.1', port: int = 8888):
         await asyncio.sleep(3600)
 
 
+class VulnerableServer:
+    """Wrapper class for the vulnerable sandbox server."""
+    
+    def __init__(self, host: str = '127.0.0.1', port: int = 8888):
+        self.host = host
+        self.port = port
+        self.runner = None
+        self.site = None
+        self.task = None
+    
+    async def start(self):
+        """Start the vulnerable server."""
+        app = create_sandbox_app()
+        self.runner = web.AppRunner(app)
+        await self.runner.setup()
+        self.site = web.TCPSite(self.runner, self.host, self.port)
+        await self.site.start()
+        
+        print(f"\n🎪 PennyWise Vulnerable Sandbox running at http://{self.host}:{self.port}/sandbox")
+        print("⚠️  WARNING: This server contains intentional vulnerabilities. For testing only!\n")
+    
+    async def stop(self):
+        """Stop the vulnerable server."""
+        if self.site:
+            await self.site.stop()
+        if self.runner:
+            await self.runner.cleanup()
+        print("Sandbox server stopped.")
+
+
 if __name__ == '__main__':
     asyncio.run(run_sandbox_server())

@@ -1197,6 +1197,58 @@ async def handle_report_delete(request: web.Request) -> web.Response:
     return web.json_response({'error': 'Report not found'}, status=404)
 
 
+async def handle_ai_logs(request: web.Request) -> web.Response:
+    """Get AI activity logs."""
+    try:
+        from ..ai.model_interface import get_ai_model
+
+        ai_model = get_ai_model()
+        if ai_model:
+            logs = ai_model.get_ai_logs()
+            # Convert dataclass objects to dicts for JSON serialization
+            logs_data = []
+            for log in logs:
+                if hasattr(log, '__dict__'):
+                    log_dict = log.__dict__
+                elif isinstance(log, dict):
+                    log_dict = log
+                else:
+                    log_dict = {'data': str(log)}
+                logs_data.append(log_dict)
+
+            return web.json_response({
+                'logs': logs_data,
+                'total': len(logs_data)
+            })
+        else:
+            return web.json_response({'logs': [], 'total': 0})
+
+    except Exception as e:
+        logger.error(f"Failed to get AI logs: {e}")
+        return web.json_response({'error': str(e)}, status=500)
+
+
+async def handle_ai_logs_summary(request: web.Request) -> web.Response:
+    """Get AI activity logs summary."""
+    try:
+        from ..ai.model_interface import get_ai_model
+
+        ai_model = get_ai_model()
+        if ai_model:
+            summary = ai_model.get_ai_logs_summary()
+            return web.json_response(summary)
+        else:
+            return web.json_response({
+                'total_operations': 0,
+                'success_rate': 0.0,
+                'average_processing_time': 0.0
+            })
+
+    except Exception as e:
+        logger.error(f"Failed to get AI logs summary: {e}")
+        return web.json_response({'error': str(e)}, status=500)
+
+
 def create_app() -> web.Application:
     """Create the web application."""
     app = web.Application()
@@ -1229,7 +1281,11 @@ def create_app() -> web.Application:
     app.router.add_get('/api/reports', handle_reports_list)
     app.router.add_get('/api/reports/{filename}', handle_report_get)
     app.router.add_delete('/api/reports/{filename}', handle_report_delete)
-    
+
+    # Routes - AI Logs
+    app.router.add_get('/api/ai/logs', handle_ai_logs)
+    app.router.add_get('/api/ai/logs/summary', handle_ai_logs_summary)
+
     # Apply CORS to all routes
     for route in list(app.router.routes()):
         cors.add(route)

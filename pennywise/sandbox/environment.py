@@ -15,6 +15,8 @@ from enum import Enum
 import threading
 from collections import deque
 
+from ..utils.logging import PennywiseLogger
+
 logger = logging.getLogger(__name__)
 
 
@@ -176,7 +178,10 @@ class SandboxEnvironment:
         
         # Load existing sessions
         self._load_sessions()
-        
+
+        # Initialize comprehensive logger
+        self.comprehensive_logger = PennywiseLogger()
+
         logger.info(f"Sandbox environment initialized at {self.storage_path}")
     
     def start_session(self, target_url: Optional[str] = None, 
@@ -278,7 +283,27 @@ class SandboxEnvironment:
                     self.on_action(action)
                 except Exception as e:
                     logger.error(f"Action callback failed: {e}")
-            
+
+            # Log to comprehensive logger
+            self.comprehensive_logger.log_comprehensive_event(
+                event="sandbox_action",
+                component="sandbox_environment",
+                data={
+                    "action_type": action_type.value,
+                    "action_id": action_id,
+                    "session_id": self._current_session.id,
+                    "data_keys": list(data.keys()),
+                    "has_context": bool(context),
+                    "message": f"Sandbox action captured: {action_type.value}"
+                },
+                sandbox_data={
+                    "action_details": data,
+                    "context": context,
+                    "duration_ms": duration_ms,
+                    "session_duration": self._current_session.duration_seconds
+                }
+            )
+
             return action_id
     
     def capture_target_selection(self, url: str):

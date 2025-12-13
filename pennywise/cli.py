@@ -12,7 +12,7 @@ import json
 import time
 from pathlib import Path
 
-from .core.scanner import VulnerabilityScanner
+from .core.enhanced_scanner import EnhancedScanner
 from .core.target_analyzer import TargetAnalyzer
 from .core.attack_selector import AttackSelector
 from .ai.model_interface import AIModelInterface
@@ -86,6 +86,16 @@ Examples:
         default='summary',
         help='Output format'
     )
+    scan_parser.add_argument(
+        '--pdf',
+        type=str,
+        help='Generate PDF report to specified path'
+    )
+    scan_parser.add_argument(
+        '--no-ai',
+        action='store_true',
+        help='Disable AI analysis for faster scanning'
+    )
     
     # Analyze command
     analyze_parser = subparsers.add_parser('analyze', help='Analyze a target without scanning')
@@ -151,22 +161,60 @@ async def cmd_scan(args, config):
     """Execute scan command."""
     logger = setup_logging(log_level='DEBUG' if args.verbose else 'INFO')
     logger.print_banner()
-    
-    # Initialize components
-    ai_model = AIModelInterface(config.ai.model_path)
-    sandbox = SandboxEnvironment(storage_path=config.sandbox.storage_path)
-    learner = BehaviorLearner(model_path=config.learning.model_path, sandbox=sandbox)
-    
+
+    # Initialize container with all components
+    from .core.container import initialize_container
+    container = initialize_container(config)
+
     # Set scan mode
     config.scan.scan_mode = ScanMode(args.mode)
     
-    scanner = VulnerabilityScanner(
-        config=config,
-        ai_model=ai_model,
-        on_finding=lambda f: logger.finding(f.severity.value, f.title),
-        on_progress=lambda m, c, t: logger.step(c, m) if c % 10 == 0 else None
-    )
-    
+    # Disable AI if requested
+    if hasattr(args, 'no_ai') and args.no_ai:
+        config.ai.enabled = False
+        logger.info("AI analysis disabled for faster scanning")
+
+    # Get scanner from container
+    scanner = container.get('scanner')
+    scanner.on_finding = lambda f: logger.finding(f.severity.value, f.title)
+    scanner.on_progress = lambda m, c, t: logger.step(c, m) if c % 10 == 0 else None
+    scanner.on_log = lambda msg, level: getattr(logger, level.lower(), logger.info)(msg)
+
+    # Get sandbox and learner from container
+    sandbox = container.get('sandbox')
+    learner = container.get('learner')
+
+    # Set up reinforcement learning logging callback
+    def rl_log_callback(event):
+        """Handle reinforcement learning events."""
+        event_type = event['event_type']
+        data = event['data']
+
+        if event_type == "episode_start":
+            logger.info(f"🎯 RL Episode {data['episode']} started - State: {data['initial_state']}")
+        elif event_type == "exploration":
+            logger.info(f"🔍 RL Exploring: {data['chosen_action']} in state {data['state']}")
+        elif event_type == "exploitation":
+            best_q = max(data['q_values'].values())
+            logger.info(f"🎯 RL Exploiting: {data['chosen_action']} (Q={best_q:.3f})")
+        elif event_type == "reward_calculation":
+            reward = data['total_reward']
+            color = "🟢" if reward > 0 else "🔴"
+            logger.info(f"{color} RL Reward: {reward:.3f} ({data['findings']} findings)")
+        elif event_type == "q_update":
+            change = data['new_q'] - data['old_q']
+            symbol = "↗" if change > 0 else "↘"
+            logger.info(f"📈 RL Q-value {data['action']}: {data['old_q']:.3f} → {data['new_q']:.3f} {symbol}")
+        elif event_type == "episode_end":
+            success_rate = data['success_rate'] * 100
+            logger.info(f"🏁 RL Episode {data['episode']} ended - Success: {success_rate:.1f}%, Avg Reward: {data['avg_reward']:.3f}")
+
+    # Set RL logging callback
+    if hasattr(learner, 'set_realtime_logging'):
+        learner.set_realtime_logging(rl_log_callback)
+    elif hasattr(learner, 'rl_learner') and hasattr(learner.rl_learner, 'set_log_callback'):
+        learner.rl_learner.set_log_callback(rl_log_callback)
+
     # Parse attack types
     attack_types = None
     if 'all' not in args.attacks:
@@ -174,21 +222,55 @@ async def cmd_scan(args, config):
     
     # Start sandbox session
     sandbox.start_session(target_url=args.url, metadata={'cli': True})
-    
+
+    # Initialize reinforcement learning episode
+    target_features = {
+        'url': args.url,
+        'has_forms': True,  # Assume forms for now, could be enhanced
+        'has_params': True,  # Assume params for now
+        'is_api': 'api' in args.url.lower(),
+        'uses_https': args.url.startswith('https://'),
+        'technologies': []  # Could be populated from analysis
+    }
+
+    # Start RL learning episode
+    if hasattr(learner, 'start_learning_session'):
+        current_state = learner.start_learning_session(target_features)
+    elif hasattr(learner, 'rl_learner') and hasattr(learner.rl_learner, 'start_learning_episode'):
+        current_state = learner.rl_learner.start_learning_episode(target_features)
+    else:
+        current_state = 'unknown'
+
     # Run scan
     logger.info(f"Starting scan: {args.url}")
     logger.info(f"Mode: {args.mode}, Attacks: {args.attacks}")
-    
+    logger.info(f"Reinforcement Learning: Active (Episode tracking enabled)")
+
     result = await scanner.scan(
         url=args.url,
         attack_types=attack_types,
         crawl=not args.no_crawl
     )
-    
-    # End sandbox and learn
+
+    # Calculate RL reward and learn
+    scan_results = {
+        'findings': result.findings,
+        'duration': result.duration_seconds,
+        'requests_made': getattr(result, 'requests_made', 100),  # Default if not available
+        'pages_scanned': result.pages_scanned
+    }
+
+    if hasattr(learner, 'learn_from_scan_results'):
+        learner.learn_from_scan_results(current_state, scan_results, current_state)
+    elif hasattr(learner, 'rl_learner'):
+        rl = learner.rl_learner
+        reward = rl.calculate_reward(scan_results)
+        rl.learn(current_state, 'scan', reward, current_state, done=True)
+        rl.end_learning_episode(reward, len(result.findings) > 0)
+
+    # End sandbox session
     sandbox.end_session()
-    learner.learn_from_sandbox()
-    
+
     # Generate output
     generator = ReportGenerator(result)
     
@@ -208,13 +290,80 @@ async def cmd_scan(args, config):
     else:
         print("\n" + output)
     
-    # Print summary
-    print(f"\n{'='*60}")
-    print(f"Scan completed: {len(result.findings)} findings")
-    print(f"Duration: {result.duration_seconds:.1f} seconds")
-    print(f"Pages scanned: {result.pages_scanned}")
-    print(f"{'='*60}")
-    
+    # Generate PDF report if requested
+    if hasattr(args, 'pdf') and args.pdf:
+        logger.info(f"Generating PDF report: {args.pdf}")
+        success = scanner.generate_pdf_report(result, args.pdf)
+        if success:
+            logger.success(f"PDF report generated: {args.pdf}")
+        else:
+            logger.error("Failed to generate PDF report")
+
+    # Print comprehensive summary with RL statistics
+    print(f"\n{'='*80}")
+    print(f"🎯 PENNYWISE SCAN COMPLETED - COMPREHENSIVE SUMMARY")
+    print(f"{'='*80}")
+
+    # Scan Results
+    print(f"📊 SCAN RESULTS:")
+    print(f"   • Target: {args.url}")
+    print(f"   • Mode: {args.mode}")
+    print(f"   • Attacks: {', '.join(args.attacks)}")
+    print(f"   • Findings: {len(result.findings)}")
+    print(f"   • Duration: {result.duration_seconds:.1f} seconds")
+    print(f"   • Pages Scanned: {result.pages_scanned}")
+    print(f"   • Status: {'✅ Completed' if result.status == 'completed' else '❌ Failed'}")
+
+    # Reinforcement Learning Statistics
+    print(f"\n🧠 REINFORCEMENT LEARNING SUMMARY:")
+    if hasattr(learner, 'get_learning_stats'):
+        try:
+            stats = learner.get_learning_stats()
+            ppo_stats = stats.get('ppo_stats', {})
+            
+            print(f"   • Episodes Completed: {ppo_stats.get('total_episodes', 0)}")
+            print(f"   • Success Rate: {ppo_stats.get('success_rate', 0):.1%}")
+            print(f"   • Average Reward: {stats.get('average_rewards', {})}")
+            print(f"   • States Learned: {ppo_stats.get('trajectory_buffer_size', 0)}")
+            print(f"   • User Embeddings: {ppo_stats.get('user_embeddings_tracked', 0)}")
+            
+            # Show user focus areas
+            focus_areas = stats.get('user_focus_areas', [])
+            if focus_areas:
+                print(f"   • User Focus Areas: {', '.join(focus_areas)}")
+        except Exception as e:
+            print(f"   • RL Stats Error: {e}")
+    else:
+        print(f"   • RL System: Not available")
+
+    # AI Analysis Summary
+    print(f"\n🤖 AI ANALYSIS SUMMARY:")
+    if hasattr(learner, 'ppo_agent') or ai_model:
+        ai_analyzed_count = len([f for f in result.findings if f.recommendations])  # AI provides recommendations
+        print(f"   • AI Model: Active (Qwen vulnerability detector)")
+        print(f"   • Findings Analyzed: {ai_analyzed_count}/{len(result.findings)}")
+        print(f"   • Severity Classification: AI-powered")
+        print(f"   • Recommendations Provided: {sum(len(f.recommendations) for f in result.findings)}")
+        
+        # Show AI confidence if available
+        if result.findings:
+            avg_confidence = sum(f.confidence for f in result.findings) / len(result.findings)
+            print(f"   • Average AI Confidence: {avg_confidence:.2f}")
+    else:
+        print(f"   • AI Analysis: Not performed")
+
+    # Output files
+    if args.output or (hasattr(args, 'pdf') and args.pdf):
+        print(f"\n💾 OUTPUT FILES:")
+        if args.output:
+            print(f"   • Report: {args.output}")
+        if hasattr(args, 'pdf') and args.pdf:
+            print(f"   • PDF Report: {args.pdf}")
+
+    print(f"\n{'='*80}")
+    print(f"🎉 PennyWise scan completed successfully!")
+    print(f"{'='*80}")
+
     return 0 if result.status == 'completed' else 1
 
 

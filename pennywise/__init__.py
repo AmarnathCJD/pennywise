@@ -22,7 +22,7 @@ Core Components:
 __version__ = "2.0.0"
 __author__ = "PennyWise Team"
 
-from .core.scanner import VulnerabilityScanner
+from .core.enhanced_scanner import EnhancedScanner
 from .core.attack_selector import AttackSelector
 from .core.target_analyzer import TargetAnalyzer
 from .sandbox.environment import SandboxEnvironment

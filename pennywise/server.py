@@ -10,7 +10,8 @@ import json
 from datetime import datetime
 from aiohttp import web
 
-from .core.scanner import VulnerabilityScanner, ScanResult
+from .core.enhanced_scanner import EnhancedScanner
+from .core.scanner import ScanResult
 from .core.target_analyzer import TargetAnalyzer
 from .core.attack_selector import AttackSelector
 from .ai.model_interface import AIModelInterface
@@ -46,7 +47,7 @@ class PennywiseAPI:
         
         # Initialize components
         self.ai_model = AIModelInterface(self.config.ai.model_path)
-        self.scanner = VulnerabilityScanner(
+        self.scanner = EnhancedScanner(
             config=self.config,
             ai_model=self.ai_model,
             on_finding=self._on_finding,

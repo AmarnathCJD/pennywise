@@ -21,6 +21,7 @@ class AttackType(Enum):
     IDOR = "idor"
     RCE = "rce"
     LFI = "lfi"
+    XXE = "xxe"
     OPEN_REDIRECT = "open_redirect"
     SECURITY_MISCONFIGURATION = "security_misconfiguration"
 
@@ -74,7 +75,8 @@ class ScanConfig:
 @dataclass
 class AIConfig:
     """Configuration for AI model integration."""
-    model_path: str = "./qwen-vuln-detector/localmodel"
+    enabled: bool = True  # Enable/disable AI analysis for faster scanning
+    model_path: str = "./qwen-vuln-detector"
     use_local_model: bool = True
     
     # Fallback API (when local model fails)
