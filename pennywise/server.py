@@ -19,6 +19,7 @@ from .learning.behavior_learner import BehaviorLearner
 from .config import PennywiseConfig, AttackType, ScanMode
 from .utils.logging import setup_logging, PennywiseLogger
 from .utils.reports import ReportGenerator
+from .utils.export_manager import ExportManager
 
 
 class PennywiseAPI:
@@ -63,6 +64,20 @@ class PennywiseAPI:
             sandbox=self.sandbox
         )
         
+        # Initialize AI target analyzer
+        try:
+            from .ai.target_analyzer import AITargetAnalyzer
+            import os
+            lora_path = "./lora/analyser/lora"
+            if os.path.exists(lora_path):
+                self.ai_analyzer = AITargetAnalyzer(model_path=lora_path)
+            else:
+                self.ai_analyzer = AITargetAnalyzer()  # Rule-based fallback
+        except Exception as e:
+            self.logger.warning(f"AI analyzer initialization failed: {e}")
+            from .ai.target_analyzer import AITargetAnalyzer
+            self.ai_analyzer = AITargetAnalyzer()  # Rule-based fallback
+        
         # Current scan result
         self.current_result: ScanResult = None
         
@@ -85,6 +100,7 @@ class PennywiseAPI:
         self.app.router.add_post('/api/scan', self._handle_scan)
         self.app.router.add_post('/api/analyze', self._handle_analyze)
         self.app.router.add_post('/api/attack/select', self._handle_attack_select)
+        self.app.router.add_post('/api/ai-analyze', self._handle_ai_analyze)
         
         # Findings and reports
         self.app.router.add_get('/api/findings', self._handle_get_findings)
@@ -322,6 +338,126 @@ class PennywiseAPI:
                 status=500
             )
     
+    async def _handle_ai_analyze(self, request):
+        """
+        AI-powered target analysis with attack type recommendations.
+        
+        Request body: {"url": "https://target.com"}
+        """
+        try:
+            data = await request.json()
+            url = data.get('url', '').strip()
+            
+            if not url:
+                return web.json_response(
+                    {'error': 'URL is required'},
+                    status=400
+                )
+            
+            # Fetch target page
+            import aiohttp
+            import asyncio
+            from bs4 import BeautifulSoup
+            
+            async with aiohttp.ClientSession() as session:
+                try:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                        html_content = await resp.text()
+                        headers = dict(resp.headers)
+                        status_code = resp.status
+                except asyncio.TimeoutError:
+                    return web.json_response(
+                        {'error': 'Request timeout - target not reachable'},
+                        status=504
+                    )
+                except Exception as e:
+                    return web.json_response(
+                        {'error': f'Failed to fetch target: {str(e)}'},
+                        status=500
+                    )
+            
+            # Parse HTML
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # Extract forms
+            forms = []
+            for form in soup.find_all('form'):
+                form_data = {
+                    'method': form.get('method', 'GET'),
+                    'action': form.get('action', ''),
+                    'inputs': []
+                }
+                for input_tag in form.find_all(['input', 'textarea', 'select']):
+                    form_data['inputs'].append({
+                        'type': input_tag.get('type', 'text'),
+                        'name': input_tag.get('name', ''),
+                        'value': input_tag.get('value', '')
+                    })
+                forms.append(form_data)
+            
+            # Detect tech stack (basic)
+            tech_stack = []
+            if soup.find('meta', attrs={'name': 'generator'}):
+                tech_stack.append(soup.find('meta', attrs={'name': 'generator'}).get('content', ''))
+            
+            # Check for common frameworks
+            html_lower = html_content.lower()
+            if 'wp-content' in html_lower:
+                tech_stack.append('WordPress')
+            if 'drupal' in html_lower:
+                tech_stack.append('Drupal')
+            if 'joomla' in html_lower:
+                tech_stack.append('Joomla')
+            if 'react' in html_lower or '_next' in html_lower:
+                tech_stack.append('React/Next.js')
+            if 'vue' in html_lower:
+                tech_stack.append('Vue.js')
+            
+            # Run AI analysis
+            analysis_result = await self.ai_analyzer.analyze_target(
+                url=url,
+                html_content=html_content,
+                headers=headers,
+                forms=forms,
+                tech_stack=tech_stack
+            )
+            
+            # Check if analysis was successful
+            if not analysis_result.get('success', True):
+                # AI failed, but we still return results with fallback
+                return web.json_response({
+                    'success': True,  # Overall success (we have fallback)
+                    'url': url,
+                    'status_code': status_code,
+                    'analysis': {
+                        'attack_types': analysis_result.get('attack_types', ['xss', 'sqli', 'csrf']),
+                        'vulnerabilities': [],
+                        'reasoning': analysis_result.get('reasoning', 'AI model returned invalid output. Using default scan recommendations.'),
+                        'recommendation': {},
+                        'method': 'fallback',
+                        'error': analysis_result.get('error', 'Unknown error'),
+                        'raw_response': analysis_result.get('raw_response', '')
+                    },
+                    'forms_detected': len(forms),
+                    'tech_stack': tech_stack
+                })
+            
+            return web.json_response({
+                'success': True,
+                'url': url,
+                'status_code': status_code,
+                'analysis': analysis_result,
+                'forms_detected': len(forms),
+                'tech_stack': tech_stack
+            })
+            
+        except Exception as e:
+            self.logger.error(f"AI analysis failed: {e}")
+            return web.json_response(
+                {'error': str(e), 'success': False},
+                status=500
+            )
+    
     async def _handle_get_findings(self, request):
         """Get findings from current scan."""
         if not self.current_result:
@@ -344,27 +480,140 @@ class PennywiseAPI:
                 status=404
             )
         
-        generator = ReportGenerator(self.current_result)
-        
-        if format_type == 'json':
-            return web.json_response(json.loads(generator.generate_json()))
-        
-        elif format_type == 'html':
-            html = generator.generate_html()
-            return web.Response(text=html, content_type='text/html')
-        
-        elif format_type == 'markdown' or format_type == 'md':
-            md = generator.generate_markdown()
-            return web.Response(text=md, content_type='text/markdown')
-        
-        elif format_type == 'summary':
-            summary = generator.generate_summary()
-            return web.Response(text=summary, content_type='text/plain')
-        
+        # Handle both dict and ScanResult object
+        if isinstance(self.current_result, dict):
+            # Current result is already a dict from streaming scanner
+            result_dict = self.current_result
+            target_url = result_dict.get('target_url', 'Unknown')
+            timestamp = result_dict.get('timestamp', datetime.now().isoformat())
+            findings_list = result_dict.get('findings', [])
+            pages_scanned = result_dict.get('pages_scanned', result_dict.get('pages_crawled', 0))
+            requests_made = result_dict.get('requests_made', 0)
+            duration = result_dict.get('duration_seconds', 0)
+            severity_breakdown = result_dict.get('severity_breakdown', {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0})
+            
+            # Normalize findings to dict format
+            normalized_findings = []
+            for f in findings_list:
+                if isinstance(f, dict):
+                    normalized_findings.append(f)
+                else:
+                    normalized_findings.append({
+                        'title': f.title,
+                        'severity': f.severity,
+                        'attack_type': f.attack_type,
+                        'url': f.url,
+                        'parameter': f.parameter,
+                        'payload': f.payload,
+                        'evidence': f.evidence,
+                        'confidence': f.confidence
+                    })
         else:
+            # ScanResult object
+            target_url = self.current_result.target_url
+            timestamp = self.current_result.scan_started.isoformat() if self.current_result.scan_started else datetime.now().isoformat()
+            pages_scanned = self.current_result.pages_scanned
+            requests_made = self.current_result.requests_made
+            duration = self.current_result.duration_seconds
+            severity_breakdown = self.current_result.get_severity_breakdown()
+            
+            normalized_findings = [
+                {
+                    'title': f.title,
+                    'severity': f.severity,
+                    'attack_type': f.attack_type,
+                    'url': f.url,
+                    'parameter': f.parameter,
+                    'payload': f.payload,
+                    'evidence': f.evidence,
+                    'confidence': f.confidence
+                }
+                for f in self.current_result.findings
+            ]
+        
+        # Prepare scan data for export
+        scan_data = {
+            'target': target_url,
+            'timestamp': timestamp,
+            'findings': normalized_findings,
+            'summary': {
+                'pages_scanned': pages_scanned,
+                'requests_made': requests_made,
+                'duration_seconds': duration
+            },
+            'severity_breakdown': severity_breakdown
+        }
+        
+        # Use ExportManager for modern formats
+        export_manager = ExportManager(scan_data)
+        
+        try:
+            if format_type == 'json':
+                json_str = export_manager.export_json()
+                return web.Response(
+                    text=json_str,
+                    content_type='application/json',
+                    headers={
+                        'Content-Disposition': f'attachment; filename="pennywise-report-{datetime.now().strftime("%Y%m%d-%H%M%S")}.json"'
+                    }
+                )
+            
+            elif format_type == 'html':
+                html = export_manager.export_html()
+                return web.Response(
+                    text=html,
+                    content_type='text/html',
+                    headers={
+                        'Content-Disposition': f'attachment; filename="pennywise-report-{datetime.now().strftime("%Y%m%d-%H%M%S")}.html"'
+                    }
+                )
+            
+            elif format_type == 'xml':
+                xml = export_manager.export_xml()
+                return web.Response(
+                    text=xml,
+                    content_type='application/xml',
+                    headers={
+                        'Content-Disposition': f'attachment; filename="pennywise-report-{datetime.now().strftime("%Y%m%d-%H%M%S")}.xml"'
+                    }
+                )
+            
+            elif format_type == 'pdf':
+                pdf_bytes = export_manager.export_pdf()
+                return web.Response(
+                    body=pdf_bytes,
+                    content_type='application/pdf',
+                    headers={
+                        'Content-Disposition': f'attachment; filename="pennywise-report-{datetime.now().strftime("%Y%m%d-%H%M%S")}.pdf"'
+                    }
+                )
+            
+            # Fallback to old generator for other formats
+            elif format_type in ['markdown', 'md', 'summary']:
+                generator = ReportGenerator(self.current_result)
+                if format_type in ['markdown', 'md']:
+                    md = generator.generate_markdown()
+                    return web.Response(text=md, content_type='text/markdown')
+                else:
+                    summary = generator.generate_summary()
+                    return web.Response(text=summary, content_type='text/plain')
+            
+            else:
+                return web.json_response(
+                    {'error': f'Unknown format: {format_type}. Supported formats: json, html, xml, pdf'},
+                    status=400
+                )
+        
+        except ImportError as e:
             return web.json_response(
-                {'error': f'Unknown format: {format_type}'},
-                status=400
+                {'error': f'Export format not available: {str(e)}'},
+                status=500
+            )
+        except Exception as e:
+            self.logger.error(f"Error generating report: {str(e)}")
+            return web.json_response(
+                {'error': f'Failed to generate report: {str(e)}'},
+                status=500
             )
     
     async def _handle_sandbox_start(self, request):
@@ -585,7 +834,6 @@ class PennywiseAPI:
             
             # Run scan
             result = await streaming_scanner.scan(url=url, attack_types=attack_types, crawl=crawl, max_pages=50)
-            self.current_result = result
             
             # Send completion - handle dict result from EnhancedScanner
             findings_list = result.get('findings', []) if isinstance(result, dict) else result.findings
@@ -601,6 +849,11 @@ class PennywiseAPI:
             pages = result.get('pages_scanned', 0) if isinstance(result, dict) else result.pages_crawled
             requests = result.get('requests_made', 0) if isinstance(result, dict) else result.requests_made
             duration = result.get('duration_seconds', 0) if isinstance(result, dict) else result.duration_seconds
+            
+            # Store result with severity breakdown for export
+            if isinstance(result, dict):
+                result['severity_breakdown'] = severity_breakdown
+            self.current_result = result
             
             await self._send_sse(response, 'complete', {
                 'result': {
@@ -720,7 +973,6 @@ class PennywiseAPI:
             
             # Run scan with sandbox path
             result = await streaming_scanner.scan(url=sandbox_url, attack_types=attack_types, crawl=True, max_pages=30)
-            self.current_result = result
             
             # Send completion - handle dict result from EnhancedScanner
             findings_list = result.get('findings', []) if isinstance(result, dict) else result.findings
@@ -736,6 +988,11 @@ class PennywiseAPI:
             pages = result.get('pages_scanned', 0) if isinstance(result, dict) else result.pages_crawled
             requests = result.get('requests_made', 0) if isinstance(result, dict) else result.requests_made
             duration = result.get('duration_seconds', 0) if isinstance(result, dict) else result.duration_seconds
+            
+            # Store result with severity breakdown for export
+            if isinstance(result, dict):
+                result['severity_breakdown'] = severity_breakdown
+            self.current_result = result
             
             await self._send_sse(response, 'complete', {
                 'result': {

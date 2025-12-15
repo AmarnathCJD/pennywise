@@ -27,7 +27,6 @@ from .core.attack_selector import AttackSelector
 from .core.target_analyzer import TargetAnalyzer
 from .sandbox.environment import SandboxEnvironment
 from .learning.behavior_learner import BehaviorLearner
-from .ai.model_interface import AIModelInterface
 
 __all__ = [
     "VulnerabilityScanner",
@@ -35,5 +34,4 @@ __all__ = [
     "TargetAnalyzer",
     "SandboxEnvironment",
     "BehaviorLearner",
-    "AIModelInterface"
 ]

@@ -85,6 +85,16 @@ class ScanResult:
     def get_findings_by_type(self, attack_type: AttackType) -> List[Finding]:
         return [f for f in self.findings if f.attack_type == attack_type]
     
+    def get_severity_breakdown(self) -> Dict[str, int]:
+        """Get count of findings by severity level."""
+        return {
+            'critical': len(self.get_findings_by_severity(SeverityLevel.CRITICAL)),
+            'high': len(self.get_findings_by_severity(SeverityLevel.HIGH)),
+            'medium': len(self.get_findings_by_severity(SeverityLevel.MEDIUM)),
+            'low': len(self.get_findings_by_severity(SeverityLevel.LOW)),
+            'info': len(self.get_findings_by_severity(SeverityLevel.INFO)),
+        }
+    
     def to_dict(self) -> Dict[str, Any]:
         return {
             'target_url': self.target_url,
