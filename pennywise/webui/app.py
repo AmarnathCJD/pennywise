@@ -15,6 +15,8 @@ import aiohttp_cors
 
 from ..core.enhanced_scanner import EnhancedScanner, VulnerabilityFinding, ScanProgress
 from ..ai.analyzer import get_ai_analyzer
+from ..ai.remedy_analyzer import AIRemedyAnalyzer
+from ..ai.classifier import AIVulnerabilityClassifier
 from ..config import AttackType, PennywiseConfig
 
 logger = logging.getLogger(__name__)
@@ -259,6 +261,83 @@ async def handle_analyze_target(request: web.Request) -> web.Response:
         })
     
     except Exception as e:
+        return web.json_response({'error': str(e)}, status=500)
+
+
+async def handle_remedy_analysis(request: web.Request) -> web.Response:
+    """Generate AI-powered remediation recommendations for a vulnerability."""
+    try:
+        data = await request.json()
+    except:
+        return web.json_response({'error': 'Invalid JSON data'}, status=400)
+    
+    # Extract vulnerability details
+    vuln_type = data.get('vuln_type')
+    endpoint = data.get('endpoint')
+    parameter = data.get('parameter')
+    payload = data.get('payload')
+    
+    if not all([vuln_type, endpoint, parameter]):
+        return web.json_response({
+            'error': 'Missing required fields: vuln_type, endpoint, parameter'
+        }, status=400)
+    
+    try:
+        # Initialize remedy analyzer (with optional LoRA model path)
+        # For now, will use rule-based remediation
+        remedy_analyzer = AIRemedyAnalyzer()
+        
+        # Generate remediation report
+        report = remedy_analyzer.generate_remediation_report(
+            vuln_type=vuln_type,
+            endpoint=endpoint,
+            parameter=parameter,
+            payload=payload or "",
+            impact=data.get('impact', '')
+        )
+        
+        return web.json_response(report)
+    
+    except Exception as e:
+        logger.error(f"Error generating remediation: {e}", exc_info=True)
+        return web.json_response({'error': str(e)}, status=500)
+
+
+async def handle_classify_vulnerability(request: web.Request) -> web.Response:
+    """Classify vulnerability severity using AI model."""
+    try:
+        data = await request.json()
+    except:
+        return web.json_response({'error': 'Invalid JSON data'}, status=400)
+    
+    # Extract vulnerability details
+    vuln_type = data.get('vuln_type')
+    endpoint = data.get('endpoint', '')
+    parameter = data.get('parameter', '')
+    payload = data.get('payload', '')
+    impact = data.get('impact', '')
+    
+    if not vuln_type:
+        return web.json_response({'error': 'Missing required field: vuln_type'}, status=400)
+    
+    try:
+        # Initialize classifier (with optional LoRA model path)
+        # For now, will use rule-based classification (hardcoded values)
+        classifier = AIVulnerabilityClassifier()
+        
+        # Classify vulnerability
+        result = await classifier.classify_vulnerability(
+            vuln_type=vuln_type,
+            endpoint=endpoint,
+            parameter=parameter,
+            payload=payload,
+            impact=impact
+        )
+        
+        return web.json_response(result)
+    
+    except Exception as e:
+        logger.error(f"Error classifying vulnerability: {e}", exc_info=True)
         return web.json_response({'error': str(e)}, status=500)
 
 
@@ -1220,6 +1299,8 @@ def create_app() -> web.Application:
     app.router.add_get('/api/results/{scan_id}', handle_scan_result)
     app.router.add_get('/api/scans', handle_list_scans)
     app.router.add_post('/api/analyze', handle_analyze_target)
+    app.router.add_post('/api/remedy', handle_remedy_analysis)
+    app.router.add_post('/api/classify', handle_classify_vulnerability)
     
     # Routes - Configuration
     app.router.add_get('/api/config', handle_config_get)

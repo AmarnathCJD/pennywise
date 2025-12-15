@@ -1,5 +1,5 @@
 """AI module for PennyWise."""
 
-from .model_interface import AIModelInterface, MockAIModel, AIResponse
+# AI module components
 
-__all__ = ["AIModelInterface", "MockAIModel", "AIResponse"]
+__all__ = []

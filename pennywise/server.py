@@ -13,9 +13,9 @@ from aiohttp import web
 from .core.scanner import VulnerabilityScanner, ScanResult
 from .core.target_analyzer import TargetAnalyzer
 from .core.attack_selector import AttackSelector
-from .ai.model_interface import AIModelInterface
 from .sandbox.environment import SandboxEnvironment, ActionType
 from .learning.behavior_learner import BehaviorLearner
+from .learning.interactive_trainer import InteractiveTrainer
 from .config import PennywiseConfig, AttackType, ScanMode
 from .utils.logging import setup_logging, PennywiseLogger
 from .utils.reports import ReportGenerator
@@ -46,15 +46,14 @@ class PennywiseAPI:
         )
         
         # Initialize components
-        self.ai_model = AIModelInterface(self.config.ai.model_path)
         self.scanner = VulnerabilityScanner(
             config=self.config,
-            ai_model=self.ai_model,
+            ai_model=None,
             on_finding=self._on_finding,
             on_progress=self._on_progress
         )
         self.target_analyzer = TargetAnalyzer(self.config.scan)
-        self.attack_selector = AttackSelector(self.ai_model, self.config.scan.scan_mode)
+        self.attack_selector = AttackSelector(None, self.config.scan.scan_mode)
         self.sandbox = SandboxEnvironment(
             storage_path=self.config.sandbox.storage_path,
             on_action=self._on_sandbox_action
@@ -63,6 +62,9 @@ class PennywiseAPI:
             model_path=self.config.learning.model_path,
             sandbox=self.sandbox
         )
+        
+        # Initialize interactive trainer for RL demo
+        self.trainer = InteractiveTrainer()
         
         # Initialize AI target analyzer
         try:
@@ -124,6 +126,18 @@ class PennywiseAPI:
         # Streaming scan endpoints (SSE) - GET for EventSource
         self.app.router.add_get('/api/scan/stream', self._handle_scan_stream)
         self.app.router.add_get('/api/test-local/stream', self._handle_test_local_stream)
+        
+        # AI endpoints
+        self.app.router.add_post('/api/classify', self._handle_classify)
+        self.app.router.add_post('/api/remedy', self._handle_remedy)
+        
+        # Interactive Training endpoints
+        self.app.router.add_post('/api/training/start', self._handle_training_start)
+        self.app.router.add_post('/api/training/action', self._handle_training_action)
+        self.app.router.add_post('/api/training/end', self._handle_training_end)
+        self.app.router.add_get('/api/training/stats', self._handle_training_stats)
+        self.app.router.add_get('/api/training/recommendations', self._handle_training_recommendations)
+        self.app.router.add_get('/api/training/sessions', self._handle_training_sessions)
         
         # Legacy endpoints (for compatibility)
         self.app.router.add_post('/analyze_vuln', self._handle_legacy_analyze_vuln)
@@ -1156,6 +1170,145 @@ class PennywiseAPI:
         url = (await request.text()).strip()
         result = await self.scanner.scan(url, attack_types=[AttackType.XSS])
         return web.json_response(result.to_dict())
+    
+    async def _handle_classify(self, request):
+        """AI classification endpoint for vulnerability severity and CVSS"""
+        try:
+            from .ai.classifier import AIVulnerabilityClassifier
+            data = await request.json()
+            classifier = AIVulnerabilityClassifier()
+            result = await classifier.classify_vulnerability(
+                vuln_type=data.get('vuln_type'),
+                endpoint=data.get('endpoint', ''),
+                parameter=data.get('parameter', ''),
+                payload=data.get('payload', ''),
+                impact=data.get('impact', '')
+            )
+            return web.json_response(result)
+        except Exception as e:
+            self.logger.error(f"Classification error: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    async def _handle_remedy(self, request):
+        """AI remediation endpoint for fix recommendations"""
+        try:
+            from .ai.remedy_analyzer import AIRemedyAnalyzer
+            data = await request.json()
+            analyzer = AIRemedyAnalyzer(
+                model=self.ai_analyzer.model,
+                tokenizer=self.ai_analyzer.tokenizer
+            )
+            findings = []
+            findings.append({
+                'type': data.get('vuln_type'),
+                'endpoint': data.get('endpoint', ''),
+                'parameter': data.get('parameter', ''),
+                'payload': data.get('payload', ''),
+                'impact': data.get('impact', '')
+            })
+            result = await analyzer.generate_remediation_report(
+                scan_id=data.get('scan_id', ''),
+                target=data.get('target', ''),
+                findings=findings
+            )
+            return web.json_response(result)
+        except Exception as e:
+            self.logger.error(f"Remediation error: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    async def _handle_training_start(self, request):
+        """Start a new training session."""
+        try:
+            data = await request.json()
+            target = data.get('target', 'unknown')
+            session_id = self.trainer.start_session(target)
+            return web.json_response({
+                'session_id': session_id,
+                'target': target,
+                'message': 'Training session started'
+            })
+        except Exception as e:
+            self.logger.error(f"Training start error: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    async def _handle_training_action(self, request):
+        """Record a training action."""
+        try:
+            data = await request.json()
+            attack_type = data.get('attack_type')
+            payload = data.get('payload')
+            success = data.get('success', False)
+            response_time = data.get('response_time', 0.0)
+            result_data = data.get('result_data', {})
+            
+            if not attack_type or not payload:
+                return web.json_response({
+                    'error': 'attack_type and payload are required'
+                }, status=400)
+            
+            self.trainer.record_action(
+                attack_type=attack_type,
+                payload=payload,
+                success=success,
+                response_time=response_time,
+                result_data=result_data
+            )
+            
+            return web.json_response({
+                'message': 'Action recorded',
+                'success': success
+            })
+        except Exception as e:
+            self.logger.error(f"Training action error: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    async def _handle_training_end(self, request):
+        """End the current training session."""
+        try:
+            summary = self.trainer.end_session()
+            return web.json_response(summary)
+        except Exception as e:
+            self.logger.error(f"Training end error: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    async def _handle_training_stats(self, request):
+        """Get training statistics."""
+        try:
+            stats = self.trainer.get_statistics()
+            return web.json_response(stats)
+        except Exception as e:
+            self.logger.error(f"Training stats error: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    async def _handle_training_recommendations(self, request):
+        """Get payload recommendations for an attack type."""
+        try:
+            attack_type = request.query.get('attack_type')
+            if not attack_type:
+                return web.json_response({
+                    'error': 'attack_type parameter is required'
+                }, status=400)
+            
+            recommendations = self.trainer.get_recommendations(attack_type)
+            return web.json_response({
+                'attack_type': attack_type,
+                'recommendations': recommendations
+            })
+        except Exception as e:
+            self.logger.error(f"Training recommendations error: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    async def _handle_training_sessions(self, request):
+        """Get list of all training sessions."""
+        try:
+            sessions = self.trainer.list_sessions()
+            return web.json_response({
+                'sessions': sessions,
+                'count': len(sessions)
+            })
+        except Exception as e:
+            self.logger.error(f"Training sessions error: {e}")
+            return web.json_response({'error': str(e)}, status=500)
     
     def _on_finding(self, finding):
         """Callback for new findings."""

@@ -10,7 +10,6 @@ from enum import Enum
 
 from ..config import AttackType, SeverityLevel, ScanMode
 from .target_analyzer import TargetAnalysis, InputVector
-from ..ai.model_interface import AIModelInterface
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +164,7 @@ class AttackSelector:
     """
     
     def __init__(self, 
-                 ai_model: Optional[AIModelInterface] = None,
+                 ai_model,
                  scan_mode: ScanMode = ScanMode.ACTIVE):
         """
         Initialize the attack selector.

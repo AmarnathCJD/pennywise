@@ -19,7 +19,6 @@ from collections import deque
 from ..config import AttackType, SeverityLevel, ScanConfig, PennywiseConfig
 from .target_analyzer import TargetAnalyzer, TargetAnalysis, InputVector
 from .attack_selector import AttackSelector, AttackStrategy, AttackPlan
-from ..ai.model_interface import AIModelInterface
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +132,7 @@ class VulnerabilityScanner:
     
     def __init__(self, 
                  config: Optional[PennywiseConfig] = None,
-                 ai_model: Optional[AIModelInterface] = None,
+                 ai_model = None,
                  on_finding: Optional[Callable[[Finding], None]] = None,
                  on_progress: Optional[Callable[[str, int, int], None]] = None):
         """

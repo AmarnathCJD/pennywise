@@ -11,6 +11,8 @@ from dataclasses import dataclass
 
 from ..core.scanner import ScanResult, Finding
 from ..config import SeverityLevel
+from ..ai.remedy_analyzer import AIRemedyAnalyzer
+from ..ai.classifier import AIVulnerabilityClassifier
 
 
 @dataclass
@@ -35,12 +37,13 @@ class ReportGenerator:
     - Summary text
     """
     
-    def __init__(self, scan_result: ScanResult):
+    def __init__(self, scan_result: ScanResult, include_ai_insights: bool = True):
         """
         Initialize the report generator.
         
         Args:
             scan_result: Completed scan result to report on
+            include_ai_insights: Whether to include AI classification and remediation
         """
         self.result = scan_result
         self.metadata = ReportMetadata(
@@ -49,6 +52,16 @@ class ReportGenerator:
             target_url=scan_result.target_url,
             scan_duration=scan_result.duration_seconds
         )
+        self.include_ai_insights = include_ai_insights
+        
+        # Initialize AI analyzers if needed
+        if self.include_ai_insights:
+            try:
+                self.remedy_analyzer = AIRemedyAnalyzer()
+                self.classifier = AIVulnerabilityClassifier()
+            except Exception as e:
+                print(f"Warning: Could not initialize AI analyzers: {e}")
+                self.include_ai_insights = False
     
     def generate_json(self, output_path: Optional[str] = None) -> str:
         """Generate JSON report."""
@@ -335,6 +348,51 @@ class ReportGenerator:
         }
         return order.get(severity, 5)
     
+    def _get_ai_insights(self, finding: Finding) -> Dict[str, Any]:
+        """Get AI classification and remediation for a finding."""
+        insights = {'classification': None, 'remediation': None}
+        
+        if not self.include_ai_insights:
+            return insights
+        
+        try:
+            # Get classification
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            classification_result = loop.run_until_complete(
+                self.classifier.classify_vulnerability(
+                    vuln_type=finding.attack_type.value,
+                    endpoint=finding.url,
+                    parameter=finding.parameter or '',
+                    payload=finding.payload or '',
+                    impact=finding.description
+                )
+            )
+            
+            if classification_result and classification_result.get('success'):
+                insights['classification'] = classification_result.get('classification')
+            
+            # Get remediation
+            remediation_result = self.remedy_analyzer.generate_remediation_report(
+                vuln_type=finding.attack_type.value,
+                endpoint=finding.url,
+                parameter=finding.parameter or '',
+                payload=finding.payload or '',
+                impact=finding.description
+            )
+            
+            if remediation_result and remediation_result.get('success'):
+                insights['remediation'] = remediation_result.get('remediation')
+            
+            loop.close()
+            
+        except Exception as e:
+            print(f"Warning: Could not get AI insights: {e}")
+        
+        return insights
+    
     def _generate_findings_html(self) -> str:
         """Generate HTML for all findings."""
         if not self.result.findings:
@@ -346,6 +404,47 @@ class ReportGenerator:
                              key=lambda f: self._severity_order(f.severity)):
             sev_class = f"severity-{finding.severity.value}"
             
+            # Get AI insights
+            ai_insights = self._get_ai_insights(finding)
+            classification = ai_insights.get('classification')
+            remediation = ai_insights.get('remediation')
+            
+            # Classification section
+            classification_html = ""
+            if classification:
+                classification_html = f"""
+                <div class="ai-classification" style="margin-top: 15px; padding: 15px; background: rgba(0, 212, 255, 0.05); border-left: 3px solid #00d4ff;">
+                    <h4 style="margin-bottom: 10px; color: #00d4ff;">🤖 AI Classification Analysis</h4>
+                    <dl style="display: grid; grid-template-columns: 150px 1fr; gap: 8px; font-size: 0.9em;">
+                        <dt>CVSS Score:</dt><dd><strong>{classification.get('cvss_score', 'N/A')}</strong> ({classification.get('risk_level', 'N/A')})</dd>
+                        <dt>Exploitability:</dt><dd>{classification.get('exploitability', 'N/A')}</dd>
+                        <dt>Business Impact:</dt><dd>{classification.get('business_impact', 'N/A')}</dd>
+                        <dt>Remediation Effort:</dt><dd>{classification.get('remediation_effort', 'N/A')}</dd>
+                    </dl>
+                </div>
+                """
+            
+            # Remediation section
+            remediation_html = ""
+            if remediation and remediation.get('steps'):
+                steps_items = "".join(f"<li>{step}</li>" for step in remediation['steps'])
+                code_example = ""
+                if remediation.get('code_example'):
+                    code_example = f"""<div style="margin-top: 10px;">
+                        <strong>Code Example:</strong>
+                        <pre style="background: #001100; padding: 10px; margin-top: 5px; overflow-x: auto;">{remediation['code_example']}</pre>
+                    </div>"""
+                
+                remediation_html = f"""
+                <div class="ai-remediation" style="margin-top: 15px; padding: 15px; background: rgba(124, 58, 237, 0.05); border-left: 3px solid #7c3aed;">
+                    <h4 style="margin-bottom: 10px; color: #7c3aed;">🛡️ AI Remediation Guide</h4>
+                    <div style="display: inline-block; padding: 4px 12px; background: rgba(255, 140, 66, 0.2); color: #ff8c42; border-radius: 4px; font-size: 0.75em; font-weight: bold; text-transform: uppercase; margin-bottom: 10px;">Priority: {remediation.get('priority', 'Medium')}</div>
+                    <ol style="margin-left: 20px; line-height: 1.8;">{steps_items}</ol>
+                    {code_example}
+                </div>
+                """
+            
+            # Original recommendations
             recs_html = ""
             if finding.recommendations:
                 recs_items = "".join(f"<li>{r}</li>" for r in finding.recommendations)
@@ -371,6 +470,8 @@ class ReportGenerator:
                     {"<dt>Payload</dt><dd><code>" + finding.payload + "</code></dd>" if finding.payload else ""}
                     <dt>Confidence</dt><dd>{finding.confidence:.0%}</dd>
                 </dl>
+                {classification_html}
+                {remediation_html}
                 {recs_html}
             </div>
             """

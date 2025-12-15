@@ -533,7 +533,10 @@ class EnhancedScanner:
                 
                 # Flush any remaining batched logs
                 if self._log_batch:
-                    self.on_log("\n".join(self._log_batch), "info")
+                    if asyncio.iscoroutinefunction(self.on_log):
+                        await self.on_log("\n".join(self._log_batch), "info")
+                    else:
+                        self.on_log("\n".join(self._log_batch), "info")
                     self._log_batch.clear()
                 
                 # Phase 7: Generate summary

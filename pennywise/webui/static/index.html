@@ -142,6 +142,27 @@
         .finding-title { font-size: 0.8rem; font-weight: 500; margin-bottom: 0.3rem; }
         .finding-meta { display: flex; gap: 0.5rem; font-size: 0.65rem; color: var(--text-muted); }
         .finding-url { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-secondary); margin-top: 0.3rem; word-break: break-all; }
+        
+        /* Training Panel */
+        .training-panel { display: none; padding: 1.25rem; margin-top: 1rem; background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 12px; }
+        .training-panel.active { display: block; animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .training-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        .training-title { font-size: 0.85rem; font-weight: 600; color: var(--accent-secondary); display: flex; align-items: center; gap: 0.5rem; }
+        .training-recording { display: flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; color: var(--text-secondary); }
+        .recording-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--critical); animation: blink 1s ease-in-out infinite; }
+        .training-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; }
+        .training-stat { background: rgba(0, 0, 0, 0.3); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); }
+        .training-stat-value { font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 600; color: var(--accent-secondary); margin-bottom: 0.25rem; }
+        .training-stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .recommendations-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+        .recommendations-title { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .recommendations-list { display: flex; flex-direction: column; gap: 0.5rem; }
+        .recommendation-item { background: rgba(0, 0, 0, 0.3); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s; }
+        .recommendation-item:hover { background: rgba(124, 58, 237, 0.1); border-color: var(--accent-secondary); }
+        .recommendation-payload { color: var(--text); flex: 1; }
+        .recommendation-score { color: var(--accent-secondary); font-weight: 600; margin-left: 0.5rem; }
+        
         @media (max-width: 768px) { .app { padding: 1rem; } .input-section { flex-direction: column; } .stats-row { flex-wrap: wrap; } .severity-pills { margin-left: 0; margin-top: 0.5rem; width: 100%; } }
         
         /* Export Modal */
@@ -168,9 +189,43 @@
         .modal-btn-secondary { background: rgba(255, 255, 255, 0.05); color: var(--text-primary); }
         .modal-btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
         
-        /* AI Analysis Modal - Modern Redesign */
-        .modal.ai-modal { max-width: 650px; background: linear-gradient(135deg, rgba(10, 10, 15, 0.98), rgba(26, 26, 46, 0.98)); border: 1px solid rgba(0, 212, 255, 0.3); padding: 0; overflow: hidden; }
-        .ai-modal-header { background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(124, 58, 237, 0.1)); padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(0, 212, 255, 0.2); position: relative; overflow: hidden; }
+        /* AI Analysis Modal - Enhanced Design */
+        .modal.ai-modal { 
+            max-width: 900px; 
+            background: linear-gradient(135deg, rgba(10, 10, 15, 0.98), rgba(26, 26, 46, 0.98)); 
+            border: 2px solid rgba(0, 212, 255, 0.4); 
+            padding: 0; 
+            overflow: hidden;
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.9), 0 0 60px rgba(0, 212, 255, 0.15);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal.ai-modal::-webkit-scrollbar { width: 8px; }
+        .modal.ai-modal::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+        .modal.ai-modal::-webkit-scrollbar-thumb { background: rgba(0, 212, 255, 0.3); border-radius: 4px; }
+        .modal.ai-modal::-webkit-scrollbar-thumb:hover { background: rgba(0, 212, 255, 0.5); }
+        .ai-modal-header { 
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(124, 58, 237, 0.15)); 
+            padding: 1.5rem 2rem; 
+            border-bottom: 2px solid rgba(0, 212, 255, 0.3); 
+            position: relative; 
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+        .ai-modal-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            animation: shimmer 3s infinite;
+        }
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
         .ai-modal-header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent-secondary), transparent); }
         .ai-modal-title-wrapper { position: relative; z-index: 1; }
         .ai-modal-title { font-size: 1.4rem; font-weight: 700; background: linear-gradient(135deg, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.35rem; }
@@ -225,6 +280,23 @@
         .ai-loading-text { color: var(--text-secondary); font-size: 1rem; line-height: 1.6; }
         .ai-loading-text small { display: block; margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted); }
         
+        /* Debug details styling */
+        details { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; overflow: hidden; }
+        details summary { 
+            background: rgba(255, 255, 255, 0.03); 
+            padding: 0.75rem 1rem; 
+            cursor: pointer; 
+            user-select: none; 
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        details summary:hover { background: rgba(255, 255, 255, 0.05); }
+        details[open] summary { background: rgba(0, 212, 255, 0.1); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+        details summary::marker { color: var(--accent); }
+        details > div { padding: 1rem; background: rgba(0, 0, 0, 0.2); }
+        
         .ai-modal-footer { background: rgba(0, 0, 0, 0.3); padding: 0.85rem 1rem; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 0.6rem; }
         .ai-modal-footer .modal-btn { flex: 1; padding: 0.875rem; font-size: 0.95rem; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
         .ai-modal-footer .modal-btn i { font-size: 1rem; }
@@ -255,10 +327,69 @@
             <div class="quick-actions">
                 <button class="quick-btn highlight" onclick="aiAnalyzeTarget()"><i class="fas fa-brain"></i> AI Analyze</button>
                 <button class="quick-btn highlight" onclick="testLocal()"><i class="fas fa-flask"></i> Test Local</button>
+                <button class="quick-btn" id="trainingToggle" onclick="toggleTraining()"><i class="fas fa-graduation-cap"></i> Training Mode</button>
                 <button class="quick-btn" onclick="clearLogs()"><i class="fas fa-trash-can"></i> Clear</button>
                 <button class="quick-btn" onclick="exportResults()"><i class="fas fa-file-export"></i> Export</button>
             </div>
         </div>
+        
+        <!-- Training Panel -->
+        <div class="card training-panel" id="trainingPanel">
+            <div class="training-header">
+                <div class="training-title">
+                    <i class="fas fa-graduation-cap"></i>
+                    Interactive Training Mode
+                </div>
+                <div class="training-recording">
+                    <div class="recording-dot"></div>
+                    Recording Actions
+                </div>
+            </div>
+            
+            <!-- Manual Payload Tester -->
+            <div style="background:rgba(0,0,0,0.3);padding:1rem;border-radius:8px;margin-bottom:1rem">
+                <div style="display:grid;grid-template-columns:150px 1fr auto;gap:0.75rem;margin-bottom:0.75rem">
+                    <select id="trainAttackType" style="padding:0.6rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.8rem">
+                        <option value="xss">XSS</option>
+                        <option value="sqli">SQL Injection</option>
+                        <option value="csrf">CSRF</option>
+                        <option value="lfi">LFI</option>
+                        <option value="rce">RCE</option>
+                    </select>
+                    <input type="text" id="trainPayload" placeholder="Enter custom payload..." style="padding:0.6rem 1rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.8rem">
+                    <button onclick="testManualPayload()" class="btn btn-primary" style="padding:0.6rem 1.5rem;font-size:0.8rem;white-space:nowrap"><i class="fas fa-flask"></i> Test</button>
+                </div>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                    <button onclick="recordSuccess()" class="quick-btn" style="background:rgba(107,203,119,0.2);border-color:var(--low);color:var(--low)"><i class="fas fa-check"></i> Success</button>
+                    <button onclick="recordFailure()" class="quick-btn" style="background:rgba(255,59,92,0.2);border-color:var(--critical);color:var(--critical)"><i class="fas fa-times"></i> Failed</button>
+                    <span style="font-size:0.7rem;color:var(--text-muted);margin-left:auto"><i class="fas fa-info-circle"></i> Test payloads manually and record results</span>
+                </div>
+            </div>
+            
+            <div class="training-stats-grid">
+                <div class="training-stat">
+                    <div class="training-stat-value" id="trainActions">0</div>
+                    <div class="training-stat-label">Actions</div>
+                </div>
+                <div class="training-stat">
+                    <div class="training-stat-value" id="trainSuccesses">0</div>
+                    <div class="training-stat-label">Successes</div>
+                </div>
+                <div class="training-stat">
+                    <div class="training-stat-value" id="trainPatterns">0</div>
+                    <div class="training-stat-label">Patterns</div>
+                </div>
+                <div class="training-stat">
+                    <div class="training-stat-value" id="trainScore">0.0</div>
+                    <div class="training-stat-label">Learn Score</div>
+                </div>
+            </div>
+            <div class="recommendations-section" id="recommendationsSection" style="display:none">
+                <div class="recommendations-title">Top Recommended Payloads</div>
+                <div class="recommendations-list" id="recommendationsList"></div>
+            </div>
+        </div>
+        
         <div class="card stats-row">
             <div class="stat-item"><span class="stat-value" id="statPages">0</span><span class="stat-label">pages</span></div>
             <div class="stat-item"><span class="stat-value" id="statRequests">0</span><span class="stat-label">requests</span></div>
@@ -365,7 +496,7 @@
     </div>
     
     <script>
-        let isScanning=false,findings=[],startTime=null,timerInterval=null,sevCounts={critical:0,high:0,medium:0,low:0},currentPhase='';
+        let isScanning=false,findings=[],startTime=null,timerInterval=null,sevCounts={critical:0,high:0,medium:0,low:0},currentPhase='',currentScanInfo={scan_id:'',target:''};
         const logFeed=document.getElementById('logFeed'),emptyState=document.getElementById('emptyState'),scanBtn=document.getElementById('scanBtn'),statusDot=document.getElementById('statusDot'),statusText=document.getElementById('statusText'),progressBar=document.getElementById('progressBar'),phaseIndicator=document.getElementById('phaseIndicator'),phaseText=document.getElementById('phaseText');
         
         function toggleOption(el){el.classList.toggle('active')}
@@ -443,6 +574,10 @@
             if(types.length===0){log('system','Select at least one attack type');return}
             const crawl=document.getElementById('crawlToggle').classList.contains('active');
             resetStats();setScanning(true);
+            
+            currentScanInfo.target = url;
+            currentScanInfo.scan_id = 'scan_' + Date.now();
+            
             log('system',`Target: ${url}`);
             log('info',`Attack vectors: ${types.map(t=>t.toUpperCase()).join(', ')}`);
             setPhase('Initializing...');
@@ -473,6 +608,16 @@
                         log(sev, `VULN: ${f.title || 'Vulnerability'}`, f.url, f.evidence, f.severity, f.attack_type);
                         document.getElementById('statFindings').textContent = findings.length;
                         updateSeverityCounts();
+                        
+                        if (trainingActive) {
+                            recordTrainingAction(
+                                f.attack_type || 'unknown',
+                                f.evidence || f.payload || '',
+                                true,
+                                0.0,
+                                {severity: f.severity, url: f.url, title: f.title}
+                            );
+                        }
                     } else if(data.type === 'complete') {
                         const result = data.result || {};
                         const pages = result.pages_scanned || result.pages_crawled || 0;
@@ -627,14 +772,23 @@
                 });
                 
                 let findingsHtml = '';
+                let globalIndex = 0;
                 for(const [type, typefindings] of Object.entries(byType)) {
                     findingsHtml += `<div style="margin-bottom:1rem"><div style="font-size:0.75rem;color:var(--accent);font-weight:600;margin-bottom:0.5rem;text-transform:uppercase"><i class="fas fa-folder-open"></i> ${type} (${typefindings.length})</div>`;
                     typefindings.slice(0, 5).forEach(f => {
                         const sev = (f.severity || 'info').toLowerCase();
-                        findingsHtml += `<div class="finding-item ${sev}">
-                            <div class="finding-title"><i class="fas fa-bug"></i> ${escapeHtml(f.title || 'Vulnerability')}</div>
-                            <div class="finding-meta"><span style="color:var(--${sev})">${f.severity||'INFO'}</span><span>${f.parameter?'Param: '+f.parameter:''}</span></div>
-                            ${f.url?`<div class="finding-url"><i class="fas fa-link"></i> ${escapeHtml(f.url)}</div>`:''}
+                        const fidx = globalIndex++;
+                        findingsHtml += `<div class="finding-item ${sev}" style="cursor:pointer" onclick="showVulnDetails(${fidx})">
+                            <div style="display:flex;justify-content:space-between;align-items:center">
+                                <div style="flex:1">
+                                    <div class="finding-title"><i class="fas fa-bug"></i> ${escapeHtml(f.title || 'Vulnerability')}</div>
+                                    <div class="finding-meta"><span style="color:var(--${sev})">${f.severity||'INFO'}</span><span>${f.parameter?'Param: '+f.parameter:''}</span></div>
+                                    ${f.url?`<div class="finding-url"><i class="fas fa-link"></i> ${escapeHtml(f.url)}</div>`:''}
+                                </div>
+                                <button style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:var(--accent);padding:0.5rem;border-radius:6px;cursor:pointer;margin-left:1rem" onclick="event.stopPropagation();showVulnDetails(${fidx})">
+                                    <i class="fas fa-info-circle"></i>
+                                </button>
+                            </div>
                         </div>`;
                     });
                     if(typefindings.length > 5) findingsHtml += `<div style="font-size:0.7rem;color:var(--text-muted);padding:0.5rem">... and ${typefindings.length - 5} more</div>`;
@@ -933,8 +1087,379 @@
             }, 500);
         }
         
+        async function showVulnDetails(index) {
+            const vuln = findings[index];
+            if (!vuln) return;
+            
+            const modal = document.getElementById('vuln-modal');
+            const modalBody = document.getElementById('modal-body');
+            
+            // Show modal with loading state
+            modalBody.innerHTML = `
+                <div style="padding:2rem;text-align:center;color:var(--text-muted)">
+                    <i class="fas fa-spinner fa-spin" style="font-size:2rem;color:var(--accent)"></i>
+                    <p style="margin-top:1rem">Loading AI insights...</p>
+                </div>
+            `;
+            modal.classList.add('active');
+            
+            // Fetch AI insights
+            try {
+                console.log('Fetching AI insights for:', vuln);
+                
+                const [classifyRes, remedyRes] = await Promise.all([
+                    fetch('/api/classify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            scan_id: currentScanInfo.scan_id,
+                            target: currentScanInfo.target,
+                            vuln_type: vuln.attack_type || vuln.type,
+                            endpoint: vuln.url,
+                            parameter: vuln.parameter || '',
+                            payload: vuln.payload || '',
+                            impact: vuln.evidence || vuln.details || ''
+                        })
+                    }),
+                    fetch('/api/remedy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            scan_id: currentScanInfo.scan_id,
+                            target: currentScanInfo.target,
+                            vuln_type: vuln.attack_type || vuln.type,
+                            endpoint: vuln.url,
+                            parameter: vuln.parameter || '',
+                            payload: vuln.payload || '',
+                            impact: vuln.evidence || vuln.details || ''
+                        })
+                    })
+                ]);
+                
+                console.log('Classification response:', classifyRes.status, classifyRes.ok);
+                console.log('Remediation response:', remedyRes.status, remedyRes.ok);
+                
+                const classifyData = classifyRes.ok ? await classifyRes.json() : null;
+                const remedyData = remedyRes.ok ? await remedyRes.json() : null;
+                
+                console.log('Classification data:', classifyData);
+                console.log('Remediation data:', remedyData);
+                
+                const classification = classifyData?.classification || classifyData;
+                const remediation = remedyData?.remediation || remedyData;
+                
+                // Render full details
+                modalBody.innerHTML = `
+                    <div style="display:grid;gap:1rem">
+                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem">
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem">Severity</div>
+                                <span class="severity-badge severity-${(vuln.severity || 'info').toLowerCase()}">${vuln.severity || 'Info'}</span>
+                            </div>
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem">Type</div>
+                                <span style="padding:0.35rem 0.75rem;background:rgba(124,58,237,0.15);color:var(--accent-secondary);border-radius:6px;font-size:0.8rem;font-weight:600">${vuln.attack_type || vuln.type || 'Unknown'}</span>
+                            </div>
+                            ${classification ? `
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem">CVSS Score</div>
+                                <div style="display:flex;align-items:center;gap:0.5rem">
+                                    <span style="font-size:1.25rem;font-weight:700;color:var(--accent)">${classification.cvss_score}</span>
+                                    <span style="font-size:0.7rem;color:var(--text-secondary)">${classification.risk_level}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem">Exploitability</div>
+                                <span style="padding:0.35rem 0.75rem;background:rgba(255,140,66,0.15);color:var(--high);border-radius:6px;font-size:0.8rem;font-weight:600">${classification.exploitability}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        
+                        <div>
+                            <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem">URL</div>
+                            <code style="display:block;padding:0.75rem;background:rgba(0,0,0,0.3);border-radius:8px;font-size:0.75rem;word-break:break-all">${vuln.url || 'N/A'}</code>
+                        </div>
+                        
+                        ${vuln.parameter ? `
+                        <div>
+                            <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem">Parameter</div>
+                            <code style="padding:0.35rem 0.75rem;background:rgba(0,0,0,0.3);border-radius:6px;font-size:0.8rem">${vuln.parameter}</code>
+                        </div>
+                        ` : ''}
+                        
+                        ${vuln.payload ? `
+                        <div>
+                            <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem">Payload</div>
+                            <pre style="padding:0.75rem;background:rgba(0,0,0,0.3);border-radius:8px;font-size:0.75rem;overflow-x:auto">${escapeHtml(vuln.payload)}</pre>
+                        </div>
+                        ` : ''}
+                        
+                        <div style="background:rgba(0,212,255,0.05);border-left:3px solid var(--accent);padding:1rem;border-radius:8px">
+                            <h4 style="margin:0 0 0.75rem;color:var(--accent);font-size:0.9rem"><i class="fas fa-robot"></i> AI Classification Analysis</h4>
+                            ${classification && classification.cvss_score ? `
+                            <div style="display:grid;gap:0.5rem;font-size:0.85rem">
+                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">CVSS Score:</span><span style="font-weight:700;color:${classification.severity === 'Critical' ? 'var(--critical)' : classification.severity === 'High' ? 'var(--high)' : 'var(--medium)'};">${classification.cvss_score} (${classification.severity})</span></div>
+                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">Risk Level:</span><span style="font-weight:600">${classification.risk_level}</span></div>
+                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">Exploitability:</span><span>${classification.exploitability}</span></div>
+                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">Attack Vector:</span><span>${classification.attack_vector}</span></div>
+                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">Privileges Required:</span><span>${classification.privileges_required}</span></div>
+                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">User Interaction:</span><span>${classification.user_interaction}</span></div>
+                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">Remediation Effort:</span><span>${classification.remediation_effort}</span></div>
+                                ${classification.description ? `<div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border)"><span style="color:var(--text-muted);font-weight:600">Description:</span><div style="margin-top:0.25rem">${classification.description}</div></div>` : ''}
+                                ${classification.business_impact ? `<div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border)"><span style="color:var(--text-muted);font-weight:600">Business Impact:</span><div style="margin-top:0.25rem">${classification.business_impact}</div></div>` : ''}
+                            </div>
+                            ` : `<div style="color:var(--text-muted);font-size:0.85rem"><i class="fas fa-exclamation-circle"></i> AI classification unavailable</div>`}
+                        </div>
+                        
+                        <div style="background:rgba(124,58,237,0.05);border-left:3px solid var(--accent-secondary);padding:1rem;border-radius:8px">
+                            <h4 style="margin:0 0 0.75rem;color:var(--accent-secondary);font-size:0.9rem"><i class="fas fa-shield-alt"></i> AI Remediation Guide</h4>
+                            ${remediation && remediation.steps && remediation.steps.length > 0 ? `
+                            <div style="padding:0.35rem 0.75rem;background:rgba(255,140,66,0.2);color:var(--high);border-radius:6px;font-size:0.7rem;font-weight:700;text-transform:uppercase;width:fit-content;margin-bottom:0.75rem">
+                                Priority: ${remediation.priority || 'Medium'}
+                            </div>
+                            <ol style="margin:0;padding-left:1.5rem;color:var(--text-secondary);line-height:1.8">
+                                ${remediation.steps.map(step => `<li style="margin-bottom:0.5rem;font-size:0.85rem">${step}</li>`).join('')}
+                            </ol>
+                            ${remediation.code_example ? `
+                            <div style="margin-top:0.75rem">
+                                <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem">Code Example:</div>
+                                <pre style="padding:0.75rem;background:rgba(0,0,0,0.3);border-radius:8px;font-size:0.75rem;overflow-x:auto">${escapeHtml(remediation.code_example)}</pre>
+                            </div>
+                            ` : ''}
+                            ` : `<div style="color:var(--text-muted);font-size:0.85rem"><i class="fas fa-exclamation-circle"></i> AI remediation unavailable</div>`}
+                        </div>
+                        
+                        <!-- Raw JSON Responses -->
+                        <details style="margin-top:0.5rem">
+                            <summary style="cursor:pointer;padding:0.75rem;background:rgba(255,255,255,0.03);border-radius:8px;font-size:0.85rem;color:var(--text-secondary);user-select:none;transition:all 0.2s">
+                                <i class="fas fa-code"></i> Raw JSON Responses (Debug)
+                            </summary>
+                            <div style="margin-top:0.5rem;display:grid;gap:0.75rem">
+                                ${classifyData ? `
+                                <div>
+                                    <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem">
+                                        <i class="fas fa-robot"></i> Classification Response
+                                    </div>
+                                    <pre style="padding:0.75rem;background:rgba(0,0,0,0.5);border:1px solid var(--border);border-radius:8px;font-size:0.7rem;overflow-x:auto;max-height:300px;overflow-y:auto">${escapeHtml(JSON.stringify(classifyData, null, 2))}</pre>
+                                </div>
+                                ` : ''}
+                                ${remedyData ? `
+                                <div>
+                                    <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem">
+                                        <i class="fas fa-shield-alt"></i> Remediation Response
+                                    </div>
+                                    <pre style="padding:0.75rem;background:rgba(0,0,0,0.5);border:1px solid var(--border);border-radius:8px;font-size:0.7rem;overflow-x:auto;max-height:300px;overflow-y:auto">${escapeHtml(JSON.stringify(remedyData, null, 2))}</pre>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </details>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error fetching AI insights:', error);
+                modalBody.innerHTML = `<div style="padding:1rem;color:var(--critical)"><i class="fas fa-exclamation-triangle"></i> Error loading AI insights</div>`;
+            }
+        }
+        
+        // Training Mode Functions
+        let trainingActive = false;
+        let trainingSessionId = null;
+        let trainingStatsInterval = null;
+        
+        async function toggleTraining() {
+            const panel = document.getElementById('trainingPanel');
+            const btn = document.getElementById('trainingToggle');
+            
+            if (!trainingActive) {
+                // Start training session
+                try {
+                    const target = document.getElementById('targetUrl').value.trim() || 'unknown';
+                    const response = await fetch('/api/training/start', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({target})
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        trainingSessionId = data.session_id;
+                        trainingActive = true;
+                        panel.classList.add('active');
+                        btn.classList.add('highlight');
+                        btn.style.background = 'rgba(124, 58, 237, 0.2)';
+                        btn.style.borderColor = 'rgba(124, 58, 237, 0.5)';
+                        btn.style.color = 'var(--accent-secondary)';
+                        log('success', `🎓 Training session started: ${data.session_id.substring(0,8)}...`);
+                        
+                        // Start polling for stats
+                        trainingStatsInterval = setInterval(updateTrainingStats, 2000);
+                        updateTrainingStats();
+                    }
+                } catch (error) {
+                    console.error('Failed to start training:', error);
+                    log('critical', '❌ Failed to start training session');
+                }
+            } else {
+                // End training session
+                try {
+                    const response = await fetch('/api/training/end', {
+                        method: 'POST'
+                    });
+                    
+                    if (response.ok) {
+                        const summary = await response.json();
+                        trainingActive = false;
+                        panel.classList.remove('active');
+                        btn.classList.remove('highlight');
+                        btn.style.background = '';
+                        btn.style.borderColor = '';
+                        btn.style.color = '';
+                        
+                        if (trainingStatsInterval) {
+                            clearInterval(trainingStatsInterval);
+                            trainingStatsInterval = null;
+                        }
+                        
+                        log('success', `✅ Training complete: ${summary.total_actions || 0} actions, ${summary.successful_actions || 0} successes`);
+                        trainingSessionId = null;
+                    }
+                } catch (error) {
+                    console.error('Failed to end training:', error);
+                }
+            }
+        }
+        
+        async function updateTrainingStats() {
+            if (!trainingActive) return;
+            
+            try {
+                const response = await fetch('/api/training/stats');
+                if (response.ok) {
+                    const stats = await response.json();
+                    document.getElementById('trainActions').textContent = stats.total_actions || 0;
+                    document.getElementById('trainSuccesses').textContent = stats.successful_actions || 0;
+                    document.getElementById('trainPatterns').textContent = stats.patterns_learned || 0;
+                    document.getElementById('trainScore').textContent = (stats.learning_score || 0).toFixed(2);
+                    
+                    // Update recommendations if available
+                    if (stats.recommendations && stats.recommendations.length > 0) {
+                        updateRecommendations(stats.recommendations);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to update training stats:', error);
+            }
+        }
+        
+        function updateRecommendations(recommendations) {
+            const section = document.getElementById('recommendationsSection');
+            const list = document.getElementById('recommendationsList');
+            
+            if (recommendations.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+            
+            section.style.display = 'block';
+            list.innerHTML = recommendations.slice(0, 5).map(rec => `
+                <div class="recommendation-item" onclick="applyRecommendation('${escapeHtml(rec.payload)}')">
+                    <span class="recommendation-payload">${escapeHtml(rec.payload)}</span>
+                    <span class="recommendation-score">${rec.count}×</span>
+                </div>
+            `).join('');
+        }
+        
+        function applyRecommendation(payload) {
+            document.getElementById('trainPayload').value = payload;
+            log('info', `💡 Applied recommended payload: ${payload}`);
+        }
+        
+        let lastTestedPayload = null;
+        
+        async function testManualPayload() {
+            if (!trainingActive) {
+                log('system', '⚠️ Start training mode first');
+                return;
+            }
+            
+            const attackType = document.getElementById('trainAttackType').value;
+            const payload = document.getElementById('trainPayload').value.trim();
+            
+            if (!payload) {
+                log('system', '⚠️ Enter a payload to test');
+                return;
+            }
+            
+            lastTestedPayload = {attackType, payload, time: Date.now()};
+            log('info', `🧪 Testing ${attackType} payload: ${payload}`);
+            log('system', '⚠️ Test the payload manually, then click Success or Failed');
+        }
+        
+        async function recordSuccess() {
+            if (!trainingActive) return;
+            if (!lastTestedPayload) {
+                log('system', '⚠️ Test a payload first');
+                return;
+            }
+            
+            const responseTime = (Date.now() - lastTestedPayload.time) / 1000;
+            await recordTrainingAction(lastTestedPayload.attackType, lastTestedPayload.payload, true, responseTime);
+            log('success', `✅ Recorded successful ${lastTestedPayload.attackType}: ${lastTestedPayload.payload}`);
+            document.getElementById('trainPayload').value = '';
+            lastTestedPayload = null;
+        }
+        
+        async function recordFailure() {
+            if (!trainingActive) return;
+            if (!lastTestedPayload) {
+                log('system', '⚠️ Test a payload first');
+                return;
+            }
+            
+            const responseTime = (Date.now() - lastTestedPayload.time) / 1000;
+            await recordTrainingAction(lastTestedPayload.attackType, lastTestedPayload.payload, false, responseTime);
+            log('system', `❌ Recorded failed ${lastTestedPayload.attackType}: ${lastTestedPayload.payload}`);
+            document.getElementById('trainPayload').value = '';
+            lastTestedPayload = null;
+        }
+        
+        async function recordTrainingAction(attackType, payload, success, responseTime, resultData = {}) {
+            if (!trainingActive) return;
+            
+            try {
+                await fetch('/api/training/action', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        attack_type: attackType,
+                        payload: payload,
+                        target_url: document.getElementById('targetUrl').value,
+                        success: success,
+                        response_time: responseTime,
+                        result_data: resultData
+                    })
+                });
+                updateTrainingStats();
+            } catch (error) {
+                console.error('Failed to record training action:', error);
+            }
+        }
+        
         function escapeHtml(text){if(!text)return'';const d=document.createElement('div');d.textContent=text;return d.innerHTML}
         document.getElementById('targetUrl').addEventListener('keypress',e=>{if(e.key==='Enter'&&!isScanning)startScan()});
     </script>
+    
+    <!-- Vulnerability Details Modal -->
+    <div id="vuln-modal" class="modal-overlay">
+        <div class="modal ai-modal">
+            <div class="ai-modal-header">
+                <h3 style="margin: 0; font-size: 1.25rem; color: var(--accent);">🔍 Vulnerability Details</h3>
+                <button id="close-modal" class="modal-close" onclick="document.getElementById('vuln-modal').classList.remove('active')">×</button>
+            </div>
+            <div id="modal-body" style="padding: 1.5rem; max-height: 70vh; overflow-y: auto;">
+                <!-- Content will be injected here -->
+            </div>
+        </div>
+    </div>
 </body>
 </html>

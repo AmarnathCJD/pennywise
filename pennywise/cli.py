@@ -15,7 +15,6 @@ from pathlib import Path
 from .core.scanner import VulnerabilityScanner
 from .core.target_analyzer import TargetAnalyzer
 from .core.attack_selector import AttackSelector
-from .ai.model_interface import AIModelInterface
 from .sandbox.environment import SandboxEnvironment
 from .learning.behavior_learner import BehaviorLearner
 from .config import PennywiseConfig, AttackType, ScanMode
@@ -153,7 +152,6 @@ async def cmd_scan(args, config):
     logger.print_banner()
     
     # Initialize components
-    ai_model = AIModelInterface(config.ai.model_path)
     sandbox = SandboxEnvironment(storage_path=config.sandbox.storage_path)
     learner = BehaviorLearner(model_path=config.learning.model_path, sandbox=sandbox)
     
@@ -162,7 +160,7 @@ async def cmd_scan(args, config):
     
     scanner = VulnerabilityScanner(
         config=config,
-        ai_model=ai_model,
+        ai_model=None,
         on_finding=lambda f: logger.finding(f.severity.value, f.title),
         on_progress=lambda m, c, t: logger.step(c, m) if c % 10 == 0 else None
     )
@@ -224,8 +222,7 @@ async def cmd_analyze(args, config):
     logger.print_banner()
     
     analyzer = TargetAnalyzer(config.scan)
-    ai_model = AIModelInterface(config.ai.model_path)
-    selector = AttackSelector(ai_model, config.scan.scan_mode)
+    selector = AttackSelector(None, config.scan.scan_mode)
     
     logger.info(f"Analyzing target: {args.url}")
     
