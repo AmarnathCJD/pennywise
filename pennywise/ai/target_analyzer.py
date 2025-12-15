@@ -58,7 +58,7 @@ class AITargetAnalyzer:
             
             self.model = AutoPeftModelForCausalLM.from_pretrained(
                 model_path,
-                torch_dtype=torch.float16,
+                dtype=torch.float16,
                 device_map="auto",
                 trust_remote_code=True,
                 local_files_only=False
@@ -241,18 +241,38 @@ TECH_STACK:
     def _parse_ai_response(self, response: str) -> Dict[str, Any]:
         """Parse AI model's JSON response with automatic repair."""
         try:
-            # Extract JSON from response
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
-            if json_match:
-                json_text = json_match.group()
-            else:
-                json_text = response
+            # First, try to repair the JSON
+            repaired_response = self._repair_json(response.strip())
             
-            # Try to fix common JSON issues
-            json_text = self._repair_json(json_text)
-            
-            # Parse JSON
-            result = json.loads(json_text)
+            # Try to parse the repaired JSON directly
+            try:
+                result = json.loads(repaired_response)
+            except json.JSONDecodeError:
+                # If that fails, try line-by-line parsing
+                json_objects = []
+                for line in repaired_response.split('\n'):
+                    line = line.strip()
+                    if line.startswith('{') and line.endswith('}'):
+                        try:
+                            obj = json.loads(line)
+                            json_objects.append(obj)
+                        except:
+                            continue
+                
+                # If we found multiple objects, merge them
+                if len(json_objects) > 1:
+                    result = {}
+                    for obj in json_objects:
+                        result.update(obj)
+                elif len(json_objects) == 1:
+                    result = json_objects[0]
+                else:
+                    # Last resort: extract first valid JSON
+                    json_match = re.search(r'\{.*\}', repaired_response, re.DOTALL)
+                    if json_match:
+                        result = json.loads(json_match.group())
+                    else:
+                        raise ValueError("No valid JSON found in response")
             
             # Normalize the structure
             vulnerabilities = []
@@ -260,19 +280,47 @@ TECH_STACK:
                 vulnerabilities = result['scan_result']['vulnerabilities']
             elif 'vulnerabilities' in result:
                 vulnerabilities = result['vulnerabilities']
+            elif 'variant' in result and 'name' in result['variant']:
+                # Handle format like: {"variant": {"name": "XSS"}}
+                vulnerabilities = [result['variant']['name']]
+            elif 'status' in result and result['status'] == 'VULN':
+                # Handle status-based format
+                if 'variant' in result:
+                    vulnerabilities = [result['variant'].get('name', 'Unknown')]
             
             reasoning = ""
             if 'reasoning' in result:
                 reasoning = result['reasoning']
             elif 'scan_result' in result and 'reasoning' in result['scan_result']:
                 reasoning = result['scan_result']['reasoning']
+            elif 'variant' in result and 'details' in result['variant']:
+                # Format reasoning from variant details
+                vuln_name = result['variant'].get('name', 'Unknown')
+                details = result['variant'].get('details', [])
+                if details:
+                    reasoning = f"{vuln_name} detected: {', '.join(details)}"
+                else:
+                    reasoning = f"{vuln_name} vulnerability detected"
+                    
+                # Add impact info if present
+                if 'impact' in result['variant']:
+                    impact = result['variant']['impact']
+                    impact_str = ', '.join([k for k, v in impact.items() if v])
+                    if impact_str:
+                        reasoning += f" (Impact: {impact_str})"
             
             recommendation = result.get('recommendation', {})
+            
+            # Normalize recommendation format
+            if 'scan' in recommendation and isinstance(recommendation['scan'], list):
+                # Convert scan URLs to action format
+                recommendation['action'] = [f"Scan endpoint: {url}" for url in recommendation['scan'][:3]]
             
             # Map vulnerability names to attack types
             attack_types = self._map_vulnerabilities_to_attacks(vulnerabilities)
             
-            return {
+            # Build final response
+            response_data = {
                 'success': True,
                 'attack_types': attack_types,
                 'vulnerabilities': vulnerabilities,
@@ -282,16 +330,26 @@ TECH_STACK:
                 'raw_response': response
             }
             
+            # Add status if present
+            if 'status' in result:
+                response_data['status'] = result['status']
+            
+            return response_data
+            
         except Exception as e:
             print(f"⚠️ Failed to parse AI response: {e}")
             print(f"   Raw response: {response[:200]}...")
+            
+            # Return the raw response for UI display
             return {
                 'success': False,
-                'error': str(e),
+                'error': f"JSON Parse Error: {str(e)}",
                 'raw_response': response,
                 'attack_types': ['xss', 'sqli', 'csrf'],  # Default fallback
-                'method': 'ai-fallback',
-                'reasoning': 'AI model returned invalid JSON. Using default recommendations.'
+                'method': 'parse-error',
+                'reasoning': f'Unable to parse AI model output. Error: {str(e)}',
+                'vulnerabilities': [],
+                'recommendation': {}
             }
     
     def _repair_json(self, json_text: str) -> str:
@@ -299,24 +357,85 @@ TECH_STACK:
         # Remove any trailing commas before closing braces/brackets
         json_text = re.sub(r',(\s*[}\]])', r'\1', json_text)
         
-        # Fix unmatched brackets - count and balance them
-        open_braces = json_text.count('{')
-        close_braces = json_text.count('}')
-        open_brackets = json_text.count('[')
-        close_brackets = json_text.count(']')
+        # Track bracket/brace stack to properly close/remove them
+        stack = []
+        result = []
+        i = 0
+        in_string = False
+        escape_next = False
         
-        # Add missing closing braces
-        if open_braces > close_braces:
-            json_text += '}' * (open_braces - close_braces)
+        while i < len(json_text):
+            char = json_text[i]
+            
+            # Handle string escaping
+            if escape_next:
+                escape_next = False
+                result.append(char)
+                i += 1
+                continue
+            
+            if char == '\\':
+                escape_next = True
+                result.append(char)
+                i += 1
+                continue
+            
+            # Toggle string state
+            if char == '"':
+                in_string = not in_string
+                result.append(char)
+                i += 1
+                continue
+            
+            # If we're in a string, just copy
+            if in_string:
+                result.append(char)
+                i += 1
+                continue
+            
+            # Track brackets/braces
+            if char == '{':
+                stack.append('{')
+                result.append(char)
+            elif char == '[':
+                stack.append('[')
+                result.append(char)
+            elif char == '}':
+                if stack and stack[-1] == '{':
+                    stack.pop()
+                    result.append(char)
+                elif stack and stack[-1] == '[':
+                    # Wrong closer - fix it
+                    stack.pop()
+                    result.append(']')
+                else:
+                    # Extra closing brace - skip it
+                    pass
+            elif char == ']':
+                if stack and stack[-1] == '[':
+                    stack.pop()
+                    result.append(char)
+                elif stack and stack[-1] == '{':
+                    # Wrong closer - fix it
+                    stack.pop()
+                    result.append('}')
+                else:
+                    # Extra closing bracket - skip it
+                    pass
+            else:
+                result.append(char)
+            
+            i += 1
         
-        # Add missing closing brackets
-        if open_brackets > close_brackets:
-            json_text += ']' * (open_brackets - close_brackets)
+        # Close any remaining open brackets/braces
+        while stack:
+            opener = stack.pop()
+            if opener == '{':
+                result.append('}')
+            elif opener == '[':
+                result.append(']')
         
-        # Fix missing quotes around unquoted strings after colons
-        json_text = re.sub(r':\s*([a-zA-Z_][a-zA-Z0-9_\-\s]*)\s*([,}\]])', r': "\1"\2', json_text)
-        
-        return json_text
+        return ''.join(result)
     
     def _map_vulnerabilities_to_attacks(self, vulnerabilities: List[str]) -> List[str]:
         """Map vulnerability names to PennyWise attack types."""
