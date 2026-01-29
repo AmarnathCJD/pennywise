@@ -85,10 +85,13 @@ class AITargetAnalyzer:
                 AutoModelForCausalLM,
                 BitsAndBytesConfig,
             )
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+
 
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_compute_dtype=torch.float16,
                 bnb_4bit_use_double_quant=True,
                 bnb_4bit_quant_type="nf4",
             )
@@ -97,15 +100,17 @@ class AITargetAnalyzer:
             tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
             model = AutoModelForCausalLM.from_pretrained(
                 model_id,
-                device_map="auto",
+                device_map={"": 0},
                 trust_remote_code=True,
                 quantization_config=quantization_config,
+                low_cpu_mem_usage=True,
             )
             model.config.use_cache = False
             self.tokenizer = tokenizer
             self.model = model
 
             self.model.eval()
+            torch.set_grad_enabled(False)
             self.model_available = True
             print("✅ AI model loaded successfully")
 

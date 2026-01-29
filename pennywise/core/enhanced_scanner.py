@@ -1457,14 +1457,28 @@ class EnhancedScanner:
             parsed = urlparse(url)
             hostname = parsed.netloc.split(':')[0]  # Remove port if present
             
-            # Skip localhost/127.0.0.1
-            if hostname in ['localhost', '127.0.0.1', '::1']:
+            if not hostname:
+                logger.debug(f"No hostname found in URL: {url}")
                 return None
             
-            # Resolve DNS
+            # Return localhost as-is, resolve external domains
+            if hostname.lower() == 'localhost':
+                return '127.0.0.1'
+            if hostname in ['127.0.0.1', '::1', '0.0.0.0']:
+                return hostname
+            
+            # Resolve DNS for external domains
             ip = socket.gethostbyname(hostname)
+            if ip:
+                logger.debug(f"Resolved {hostname} to {ip}")
             return ip
-        except (socket.gaierror, socket.herror, Exception) as e:
-            logger.debug(f"DNS resolution failed for {url}: {e}")
+        except socket.gaierror as e:
+            logger.debug(f"DNS resolution failed for {url} (gaierror): {e}")
+            return None
+        except socket.herror as e:
+            logger.debug(f"DNS resolution failed for {url} (herror): {e}")
+            return None
+        except Exception as e:
+            logger.debug(f"DNS resolution failed for {url} (general exception): {e}")
             return None
 

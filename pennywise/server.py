@@ -814,7 +814,8 @@ class PennywiseAPI:
                         'attack_type': finding.attack_type.value if hasattr(finding.attack_type, 'value') else str(finding.attack_type),
                         'url': finding.url,
                         'parameter': finding.parameter,
-                        'evidence': finding.evidence[:300] if finding.evidence else None
+                        'evidence': finding.evidence[:300] if finding.evidence else None,
+                        'ip_address': finding.ip_address if hasattr(finding, 'ip_address') else None
                     }
                 })
             
@@ -953,7 +954,8 @@ class PennywiseAPI:
                         'attack_type': finding.attack_type.value if hasattr(finding.attack_type, 'value') else str(finding.attack_type),
                         'url': finding.url,
                         'parameter': finding.parameter,
-                        'evidence': finding.evidence[:300] if finding.evidence else None
+                        'evidence': finding.evidence[:300] if finding.evidence else None,
+                        'ip_address': finding.ip_address if hasattr(finding, 'ip_address') else None
                     }
                 })
             
