@@ -281,12 +281,12 @@ TECH_STACK:
             with torch.no_grad():
                 out = self.model.generate(
                     **inputs,
-                    max_new_tokens=1024,
+                    max_new_tokens=350,
                     repetition_penalty=1.05,
                     do_sample=False,
                     eos_token_id=self.tokenizer.eos_token_id,
                     pad_token_id=self.tokenizer.pad_token_id,
-                    use_cache=True,
+                    use_cache=False,
                 )
 
             full_response = self.tokenizer.decode(out[0], skip_special_tokens=True)

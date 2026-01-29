@@ -89,12 +89,15 @@ Generate a hybrid security assessment report with remediation guidance based on 
         try:
             inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
             
+            # Qwen3-compatible generation (no thinking, use_cache=False, optimized tokens)
             with torch.no_grad():
                 out = self.model.generate(
                     **inputs,
-                    max_new_tokens=600,
+                    max_new_tokens=300,
                     temperature=0.1,
-                    do_sample=False
+                    do_sample=False,
+                    use_cache=False,  # Disable cache for Qwen3 compatibility
+                    pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id
                 )
             
             response = self.tokenizer.decode(out[0], skip_special_tokens=True)

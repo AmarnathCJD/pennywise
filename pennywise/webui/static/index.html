@@ -38,7 +38,7 @@
         .brand { display: flex; align-items: center; gap: 0.875rem; }
         .brand-icon { width: 42px; height: 42px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%); border-radius: 12px; display: grid; place-items: center; font-size: 1.25rem; box-shadow: 0 0 30px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.2); }
         .brand-name { font-size: 1.375rem; font-weight: 700; letter-spacing: -0.02em; }
-        .brand-name span { background: linear-gradient(135deg, var(--accent), var(--accent-secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .brand-name span { background: linear-gradient(135deg, var(--accent), var(--accent-secondary)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
         .status-pill { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 100px; font-size: 0.75rem; color: var(--text-secondary); }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--low); box-shadow: 0 0 8px var(--low); transition: all 0.3s; }
         .status-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 1.5s ease-in-out infinite; }
@@ -171,7 +171,7 @@
         .modal { background: linear-gradient(135deg, var(--card-bg), #1a1a2e); border-radius: 16px; padding: 2rem; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); border: 1px solid rgba(0, 212, 255, 0.2); animation: modalSlide 0.3s ease-out; }
         @keyframes modalSlide { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-        .modal-title { font-size: 1.5rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), #00a8cc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .modal-title { font-size: 1.5rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), #00a8cc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
         .modal-close { background: rgba(255, 59, 92, 0.1); border: none; color: var(--critical); font-size: 1.5rem; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; transition: all 0.2s; }
         .modal-close:hover { background: var(--critical); color: #000; transform: rotate(90deg); }
         .export-formats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
@@ -228,7 +228,7 @@
         }
         .ai-modal-header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent-secondary), transparent); }
         .ai-modal-title-wrapper { position: relative; z-index: 1; }
-        .ai-modal-title { font-size: 1.4rem; font-weight: 700; background: linear-gradient(135deg, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.35rem; }
+        .ai-modal-title { font-size: 1.4rem; font-weight: 700; background: linear-gradient(135deg, #fff, var(--accent)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.35rem; }
         .ai-modal-subtitle { color: var(--text-secondary); font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; }
         .ai-modal-close { position: absolute; top: 1.5rem; right: 1.5rem; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-secondary); font-size: 1.25rem; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: grid; place-items: center; z-index: 2; }
         .ai-modal-close:hover { background: rgba(255, 59, 92, 0.2); color: var(--critical); border-color: var(--critical); transform: rotate(90deg); }
@@ -314,6 +314,7 @@
             <div class="input-section">
                 <div class="url-input-wrapper"><span class="url-icon"><i class="fas fa-globe"></i></span><input type="text" class="url-input" id="targetUrl" placeholder="https://target.com" value="http://localhost:8888"></div>
                 <button class="btn btn-primary" id="scanBtn" onclick="startScan()"><i id="scanIcon" class="fas fa-bolt"></i><span id="scanText">Scan</span></button>
+                <button class="btn" id="cancelBtn" onclick="cancelScan()" style="display:none;background:rgba(255,59,92,0.2);border:2px solid var(--critical);color:var(--critical)"><i class="fas fa-stop"></i><span>Cancel</span></button>
             </div>
             <div class="options-grid">
                 <button class="option-tag active" data-type="xss" onclick="toggleOption(this)"><i class="fas fa-code"></i> XSS</button>
@@ -503,7 +504,7 @@
         function getSelectedTypes(){return Array.from(document.querySelectorAll('.option-tag.active[data-type]')).map(el=>el.dataset.type)}
         function setPhase(phase){currentPhase=phase;phaseText.textContent=phase;phaseIndicator.style.display=phase?'flex':'none'}
         
-        function log(type,title,url='',evidence='',severity='',attackType=''){
+        function log(type,title,url='',evidence='',severity='',attackType='',ip_address=''){
             emptyState.style.display='none';
             const entry=document.createElement('div');
             entry.className=`log-entry ${type}`;
@@ -542,10 +543,18 @@
             mainLine.innerHTML=`<span class="log-time">${time}</span><span class="log-prefix">${icon} ${prefix}</span>${tags}<span class="log-content">${escapeHtml(title)}</span>`;
             entry.appendChild(mainLine);
             
-            if(url){
+            if(url || ip_address){
                 const urlLine = document.createElement('div');
                 urlLine.className = 'log-url';
-                urlLine.innerHTML = '<i class="fas fa-arrow-right"></i> ' + escapeHtml(url);
+                let urlContent = '';
+                if(url) {
+                    urlContent = '<i class="fas fa-arrow-right"></i> ' + escapeHtml(url);
+                }
+                if(ip_address) {
+                    const ipBadge = `<span style="margin-left:0.5rem;background:rgba(0,212,255,0.25);padding:0.25rem 0.6rem;border-radius:4px;color:var(--accent);font-family:JetBrains Mono,monospace;font-weight:700;border:1px solid rgba(0,212,255,0.4);display:inline-flex;align-items:center;gap:0.3rem"><i class="fas fa-network-wired" style="font-size:0.7rem"></i>${escapeHtml(ip_address)}</span>`;
+                    urlContent += ipBadge;
+                }
+                urlLine.innerHTML = urlContent;
                 entry.appendChild(urlLine);
             }
             if(evidence){
@@ -565,7 +574,7 @@
         function updateSeverityCounts(){document.getElementById('sevCritical').textContent=sevCounts.critical;document.getElementById('sevHigh').textContent=sevCounts.high;document.getElementById('sevMedium').textContent=sevCounts.medium;document.getElementById('sevLow').textContent=sevCounts.low}
         function startTimer(){startTime=Date.now();timerInterval=setInterval(()=>{document.getElementById('statTime').textContent=`${Math.round((Date.now()-startTime)/1000)}s`},1000)}
         function stopTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null}}
-        function setScanning(scanning){isScanning=scanning;statusDot.classList.toggle('active',scanning);statusText.textContent=scanning?'Scanning':'Ready';scanBtn.disabled=scanning;document.getElementById('scanIcon').className=scanning?'fas fa-spinner fa-spin':'fas fa-bolt';document.getElementById('scanText').textContent=scanning?'Scanning...':'Scan';progressBar.classList.toggle('scanning',scanning);if(scanning)startTimer();else{stopTimer();progressBar.style.width='100%';setPhase('');setTimeout(()=>progressBar.classList.remove('scanning'),300)}}
+        function setScanning(scanning){isScanning=scanning;statusDot.classList.toggle('active',scanning);statusText.textContent=scanning?'Scanning':'Ready';scanBtn.disabled=scanning;document.getElementById('scanIcon').className=scanning?'fas fa-spinner fa-spin':'fas fa-bolt';document.getElementById('scanText').textContent=scanning?'Scanning...':'Scan';progressBar.classList.toggle('scanning',scanning);const cancelBtn=document.getElementById('cancelBtn');if(cancelBtn){cancelBtn.style.display=scanning?'flex':'none'}if(scanning)startTimer();else{stopTimer();progressBar.style.width='100%';setPhase('');setTimeout(()=>progressBar.classList.remove('scanning'),300)}}
         
         async function startScan() {
             const url=document.getElementById('targetUrl').value.trim();
@@ -605,7 +614,7 @@
                         const sev = (f.severity || 'info').toLowerCase();
                         if(sevCounts.hasOwnProperty(sev)) sevCounts[sev]++;
                         findings.push(f);
-                        log(sev, `VULN: ${f.title || 'Vulnerability'}`, f.url, f.evidence, f.severity, f.attack_type);
+                        log(sev, `VULN: ${f.title || 'Vulnerability'}`, f.url, f.evidence, f.severity, f.attack_type, f.ip_address);
                         document.getElementById('statFindings').textContent = findings.length;
                         updateSeverityCounts();
                         
@@ -681,7 +690,7 @@
                         const sev = (f.severity || 'info').toLowerCase();
                         if(sevCounts.hasOwnProperty(sev)) sevCounts[sev]++;
                         findings.push(f);
-                        log(sev, `VULN: ${f.title || 'Vulnerability'}`, f.url, f.evidence, f.severity, f.attack_type);
+                        log(sev, `VULN: ${f.title || 'Vulnerability'}`, f.url, f.evidence, f.severity, f.attack_type, f.ip_address);
                         document.getElementById('statFindings').textContent = findings.length;
                         updateSeverityCounts();
                     } else if(data.type === 'complete') {
@@ -733,7 +742,7 @@
                 setTimeout(() => {
                     const sev = (f.severity || 'info').toLowerCase();
                     if(sevCounts.hasOwnProperty(sev)) sevCounts[sev]++;
-                    log(sev, `VULN: ${f.title || 'Vulnerability'}`, f.url, f.evidence, f.severity, f.attack_type);
+                    log(sev, `VULN: ${f.title || 'Vulnerability'}`, f.url, f.evidence, f.severity, f.attack_type, f.ip_address);
                     document.getElementById('statFindings').textContent = i + 1;
                     updateSeverityCounts();
                 }, i * 100); // 100ms delay between each finding
@@ -1192,9 +1201,12 @@
             
             // Show modal with loading state
             modalBody.innerHTML = `
-                <div style="padding:2rem;text-align:center;color:var(--text-muted)">
-                    <i class="fas fa-spinner fa-spin" style="font-size:2rem;color:var(--accent)"></i>
-                    <p style="margin-top:1rem">Loading AI insights...</p>
+                <div style="padding:3rem;text-align:center">
+                    <div style="width:64px;height:64px;margin:0 auto 1rem;border-radius:16px;background:linear-gradient(135deg,rgba(0,212,255,0.15),rgba(124,58,237,0.15));display:flex;align-items:center;justify-content:center">
+                        <i class="fas fa-spinner fa-spin" style="font-size:2rem;color:var(--accent)"></i>
+                    </div>
+                    <p style="color:var(--text);font-weight:600;margin-bottom:0.5rem">Analyzing Vulnerability</p>
+                    <p style="color:var(--text-muted);font-size:0.85rem">Fetching AI-powered insights and recommendations...</p>
                 </div>
             `;
             modal.classList.add('active');
@@ -1232,123 +1244,84 @@
                     })
                 ]);
                 
-                console.log('Classification response:', classifyRes.status, classifyRes.ok);
-                console.log('Remediation response:', remedyRes.status, remedyRes.ok);
-                
                 const classifyData = classifyRes.ok ? await classifyRes.json() : null;
                 const remedyData = remedyRes.ok ? await remedyRes.json() : null;
-                
-                console.log('Classification data:', classifyData);
-                console.log('Remediation data:', remedyData);
                 
                 const classification = classifyData?.classification || classifyData;
                 const remediation = remedyData?.remediation || remedyData;
                 
-                // Render full details
+                // Color configs for severity
+                const sevColors = {
+                    'critical': { bg: 'rgba(255,59,92,0.15)', color: '#ff3b5c', icon: 'skull-crossbones' },
+                    'high': { bg: 'rgba(255,140,66,0.15)', color: '#ff8c42', icon: 'radiation' },
+                    'medium': { bg: 'rgba(255,217,61,0.15)', color: '#ffd93d', icon: 'triangle-exclamation' },
+                    'low': { bg: 'rgba(107,203,119,0.15)', color: '#6bcb77', icon: 'circle-exclamation' }
+                };
+                const sevConfig = sevColors[(vuln.severity || 'low').toLowerCase()] || sevColors.low;
+                
+                // Render enhanced details with modern design - compact layout
                 modalBody.innerHTML = `
-                    <div style="display:grid;gap:1rem">
-                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem">
-                            <div>
-                                <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem">Severity</div>
-                                <span class="severity-badge severity-${(vuln.severity || 'info').toLowerCase()}">${vuln.severity || 'Info'}</span>
-                            </div>
-                            <div>
-                                <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem">Type</div>
-                                <span style="padding:0.35rem 0.75rem;background:rgba(124,58,237,0.15);color:var(--accent-secondary);border-radius:6px;font-size:0.8rem;font-weight:600">${vuln.attack_type || vuln.type || 'Unknown'}</span>
-                            </div>
-                            ${classification ? `
-                            <div>
-                                <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem">CVSS Score</div>
-                                <div style="display:flex;align-items:center;gap:0.5rem">
-                                    <span style="font-size:1.25rem;font-weight:700;color:var(--accent)">${classification.cvss_score}</span>
-                                    <span style="font-size:0.7rem;color:var(--text-secondary)">${classification.risk_level}</span>
+                    <div style="display:grid;gap:0.9rem">
+                        <!-- Header Card (Compact) -->
+                        <div style="background:linear-gradient(135deg,${sevConfig.bg},rgba(0,0,0,0.3));border:2px solid ${sevConfig.color}40;border-radius:10px;padding:0.9rem;position:relative;overflow:hidden">
+                            <div style="display:flex;gap:0.7rem;align-items:start;position:relative">
+                                <div style="width:45px;height:45px;border-radius:10px;background:${sevConfig.bg};border:2px solid ${sevConfig.color};display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:${sevConfig.color};flex-shrink:0">
+                                    <i class="fas fa-${sevConfig.icon}"></i>
+                                </div>
+                                <div style="flex:1;min-width:0">
+                                    <div style="font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:0.25rem;line-height:1.25">${escapeHtml(vuln.title || 'Vulnerability Detected')}</div>
+                                    <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.4rem;font-size:0.7rem">
+                                        <span style="padding:0.2rem 0.5rem;background:${sevConfig.color};color:#000;border-radius:5px;font-weight:700;text-transform:uppercase">${vuln.severity || 'INFO'}</span>
+                                        <span style="padding:0.2rem 0.5rem;background:rgba(124,58,237,0.25);color:var(--accent-secondary);border-radius:5px;font-weight:600;text-transform:uppercase;border:1px solid rgba(124,58,237,0.4)">${vuln.attack_type || vuln.type || 'Unknown'}</span>
+                                        ${classification ? `<span style="padding:0.2rem 0.5rem;background:rgba(0,212,255,0.2);color:var(--accent);border-radius:5px;font-weight:700;border:1px solid rgba(0,212,255,0.4)">CVSS ${classification.cvss_score || 'N/A'}</span>` : ''}
+                                    </div>
+                                    ${vuln.url ? `<div style="color:var(--text-secondary);font-size:0.72rem;display:flex;align-items:center;gap:0.3rem;margin-top:0.35rem;word-break:break-all"><i class="fas fa-link" style="color:var(--accent);font-size:0.65rem;flex-shrink:0"></i><span style="font-family:JetBrains Mono,monospace">${escapeHtml(vuln.url)}</span></div>` : ''}
+                                    ${vuln.ip_address ? `<div style="margin-top:0.25rem;padding:0.25rem 0.4rem;background:rgba(0,212,255,0.15);border-radius:5px;border:1px solid rgba(0,212,255,0.3);display:inline-flex;align-items:center;gap:0.25rem;font-size:0.65rem"><i class="fas fa-network-wired" style="color:var(--accent);"></i><span style="font-family:JetBrains Mono,monospace;color:var(--accent);font-weight:700">${escapeHtml(vuln.ip_address)}</span></div>` : ''}
                                 </div>
                             </div>
-                            <div>
-                                <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem">Exploitability</div>
-                                <span style="padding:0.35rem 0.75rem;background:rgba(255,140,66,0.15);color:var(--high);border-radius:6px;font-size:0.8rem;font-weight:600">${classification.exploitability}</span>
-                            </div>
-                            ` : ''}
                         </div>
                         
-                        <div>
-                            <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem">URL</div>
-                            <code style="display:block;padding:0.75rem;background:rgba(0,0,0,0.3);border-radius:8px;font-size:0.75rem;word-break:break-all">${vuln.url || 'N/A'}</code>
+                        <!-- Details Grid (Compact) -->
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.6rem;font-size:0.8rem">
+                            ${vuln.parameter ? `<div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:0.6rem"><div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem;font-weight:600">Parameter</div><div style="font-family:JetBrains Mono,monospace;color:var(--accent);font-weight:600;font-size:0.75rem;word-break:break-word">${escapeHtml(vuln.parameter)}</div></div>` : ''}
+                            ${classification && classification.exploitability ? `<div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:0.6rem"><div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem;font-weight:600">Exploitability</div><div style="color:var(--text);font-weight:600;font-size:0.75rem">${classification.exploitability}</div></div>` : ''}
+                            ${remediation && remediation.priority ? `<div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:0.6rem"><div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem;font-weight:600">Fix Priority</div><div style="color:var(--accent);font-weight:700;font-size:0.75rem">${remediation.priority}</div></div>` : ''}
                         </div>
                         
-                        ${vuln.parameter ? `
-                        <div>
-                            <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem">Parameter</div>
-                            <code style="padding:0.35rem 0.75rem;background:rgba(0,0,0,0.3);border-radius:6px;font-size:0.8rem">${vuln.parameter}</code>
-                        </div>
-                        ` : ''}
+                        <!-- Classification Description -->
+                        ${classification && classification.description ? `<div style="background:rgba(0,212,255,0.08);border-left:3px solid var(--accent);border-radius:7px;padding:0.7rem;font-size:0.8rem;color:var(--text-secondary);line-height:1.4">${escapeHtml(classification.description)}</div>` : ''}
                         
-                        ${vuln.payload ? `
-                        <div>
-                            <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem">Payload</div>
-                            <pre style="padding:0.75rem;background:rgba(0,0,0,0.3);border-radius:8px;font-size:0.75rem;overflow-x:auto">${escapeHtml(vuln.payload)}</pre>
-                        </div>
-                        ` : ''}
+                        <!-- Evidence (Compact) -->
+                        ${vuln.evidence || vuln.payload ? `
+                        <div style="background:rgba(0,0,0,0.3);border-left:3px solid var(--accent);border-radius:7px;padding:0.8rem">
+                            <div style="font-size:0.7rem;color:var(--accent);text-transform:uppercase;margin-bottom:0.5rem;font-weight:700;display:flex;align-items:center;gap:0.35rem"><i class="fas fa-code"></i> Evidence</div>
+                            ${vuln.payload ? `<div style="margin-bottom:0.5rem"><span style="font-size:0.6rem;color:var(--text-muted);display:block;margin-bottom:0.2rem">Payload:</span><div style="background:rgba(0,0,0,0.4);padding:0.5rem;border-radius:6px;font-family:JetBrains Mono,monospace;font-size:0.75rem;color:var(--accent-secondary);word-break:break-all;max-height:120px;overflow-y:auto">${escapeHtml(vuln.payload)}</div></div>` : ''}
+                            ${vuln.evidence ? `<div><span style="font-size:0.6rem;color:var(--text-muted);display:block;margin-bottom:0.2rem">Response:</span><div style="background:rgba(0,0,0,0.4);padding:0.5rem;border-radius:6px;font-family:JetBrains Mono,monospace;font-size:0.7rem;color:var(--text-secondary);max-height:100px;overflow-y:auto;line-height:1.4;word-break:break-all">${escapeHtml(vuln.evidence)}</div></div>` : ''}
+                        </div>` : ''}
                         
-                        <div style="background:rgba(0,212,255,0.05);border-left:3px solid var(--accent);padding:1rem;border-radius:8px">
-                            <h4 style="margin:0 0 0.75rem;color:var(--accent);font-size:0.9rem"><i class="fas fa-robot"></i> AI Classification Analysis</h4>
-                            ${classification && classification.cvss_score ? `
-                            <div style="display:grid;gap:0.5rem;font-size:0.85rem">
-                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">CVSS Score:</span><span style="font-weight:700;color:${classification.severity === 'Critical' ? 'var(--critical)' : classification.severity === 'High' ? 'var(--high)' : 'var(--medium)'};">${classification.cvss_score} (${classification.severity})</span></div>
-                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">Risk Level:</span><span style="font-weight:600">${classification.risk_level}</span></div>
-                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">Exploitability:</span><span>${classification.exploitability}</span></div>
-                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">Attack Vector:</span><span>${classification.attack_vector}</span></div>
-                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">Privileges Required:</span><span>${classification.privileges_required}</span></div>
-                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">User Interaction:</span><span>${classification.user_interaction}</span></div>
-                                <div style="display:flex;gap:1rem"><span style="color:var(--text-muted);min-width:140px;font-weight:600">Remediation Effort:</span><span>${classification.remediation_effort}</span></div>
-                                ${classification.description ? `<div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border)"><span style="color:var(--text-muted);font-weight:600">Description:</span><div style="margin-top:0.25rem">${classification.description}</div></div>` : ''}
-                                ${classification.business_impact ? `<div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border)"><span style="color:var(--text-muted);font-weight:600">Business Impact:</span><div style="margin-top:0.25rem">${classification.business_impact}</div></div>` : ''}
-                            </div>
-                            ` : `<div style="color:var(--text-muted);font-size:0.85rem"><i class="fas fa-exclamation-circle"></i> AI classification unavailable</div>`}
-                        </div>
-                        
-                        <div style="background:rgba(124,58,237,0.05);border-left:3px solid var(--accent-secondary);padding:1rem;border-radius:8px">
-                            <h4 style="margin:0 0 0.75rem;color:var(--accent-secondary);font-size:0.9rem"><i class="fas fa-shield-alt"></i> AI Remediation Guide</h4>
-                            ${remediation && remediation.steps && remediation.steps.length > 0 ? `
-                            <div style="padding:0.35rem 0.75rem;background:rgba(255,140,66,0.2);color:var(--high);border-radius:6px;font-size:0.7rem;font-weight:700;text-transform:uppercase;width:fit-content;margin-bottom:0.75rem">
-                                Priority: ${remediation.priority || 'Medium'}
-                            </div>
-                            <ol style="margin:0;padding-left:1.5rem;color:var(--text-secondary);line-height:1.8">
-                                ${remediation.steps.map(step => `<li style="margin-bottom:0.5rem;font-size:0.85rem">${step}</li>`).join('')}
-                            </ol>
+                        <!-- AI Remediation (Compact) -->
+                        ${remediation && remediation.recommendation ? `
+                        <div style="background:linear-gradient(135deg,rgba(0,212,255,0.08),rgba(124,58,237,0.08));border:2px solid rgba(0,212,255,0.2);border-radius:10px;padding:0.8rem">
+                            <div style="font-size:0.9rem;color:var(--accent);margin-bottom:0.6rem;font-weight:700;display:flex;align-items:center;gap:0.4rem"><i class="fas fa-robot"></i> AI-Powered Fix</div>
+                            <div style="color:var(--text-secondary);line-height:1.4;margin-bottom:0.7rem;font-size:0.8rem">${escapeHtml(remediation.recommendation)}</div>
+                            ${remediation.steps && remediation.steps.length > 0 ? `
+                            <div style="margin-bottom:0.6rem">
+                                <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.4rem;font-weight:600">Steps to Fix</div>
+                                <div style="display:grid;gap:0.4rem">
+                                    ${remediation.steps.map((step, i) => `
+                                        <div style="display:flex;gap:0.5rem;align-items:start;font-size:0.75rem">
+                                            <div style="width:20px;height:20px;border-radius:5px;background:var(--accent);color:#000;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.65rem;flex-shrink:0">${i + 1}</div>
+                                            <div style="flex:1;color:var(--text);line-height:1.4">${escapeHtml(step)}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>` : ''}
                             ${remediation.code_example ? `
-                            <div style="margin-top:0.75rem">
-                                <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem">Code Example:</div>
-                                <pre style="padding:0.75rem;background:rgba(0,0,0,0.3);border-radius:8px;font-size:0.75rem;overflow-x:auto">${escapeHtml(remediation.code_example)}</pre>
-                            </div>
-                            ` : ''}
-                            ` : `<div style="color:var(--text-muted);font-size:0.85rem"><i class="fas fa-exclamation-circle"></i> AI remediation unavailable</div>`}
-                        </div>
-                        
-                        <!-- Raw JSON Responses -->
-                        <details style="margin-top:0.5rem">
-                            <summary style="cursor:pointer;padding:0.75rem;background:rgba(255,255,255,0.03);border-radius:8px;font-size:0.85rem;color:var(--text-secondary);user-select:none;transition:all 0.2s">
-                                <i class="fas fa-code"></i> Raw JSON Responses (Debug)
-                            </summary>
-                            <div style="margin-top:0.5rem;display:grid;gap:0.75rem">
-                                ${classifyData ? `
-                                <div>
-                                    <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem">
-                                        <i class="fas fa-robot"></i> Classification Response
-                                    </div>
-                                    <pre style="padding:0.75rem;background:rgba(0,0,0,0.5);border:1px solid var(--border);border-radius:8px;font-size:0.7rem;overflow-x:auto;max-height:300px;overflow-y:auto">${escapeHtml(JSON.stringify(classifyData, null, 2))}</pre>
-                                </div>
-                                ` : ''}
-                                ${remedyData ? `
-                                <div>
-                                    <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem">
-                                        <i class="fas fa-shield-alt"></i> Remediation Response
-                                    </div>
-                                    <pre style="padding:0.75rem;background:rgba(0,0,0,0.5);border:1px solid var(--border);border-radius:8px;font-size:0.7rem;overflow-x:auto;max-height:300px;overflow-y:auto">${escapeHtml(JSON.stringify(remedyData, null, 2))}</pre>
-                                </div>
-                                ` : ''}
-                            </div>
-                        </details>
+                            <div>
+                                <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.4rem;font-weight:600">Code Example</div>
+                                <div style="background:rgba(0,0,0,0.5);padding:0.6rem;border-radius:7px;font-family:JetBrains Mono,monospace;font-size:0.7rem;color:var(--accent-secondary);line-height:1.4;overflow-x:auto;border:1px solid rgba(255,255,255,0.1);max-height:120px;overflow-y:auto">${escapeHtml(remediation.code_example)}</div>
+                            </div>` : ''}
+                        </div>` : ''}
                     </div>
                 `;
             } catch (error) {
@@ -1541,18 +1514,39 @@
             }
         }
         
+        
+        function cancelScan() {
+            if (!currentScanInfo.scan_id) {
+                log('system', 'No active scan to cancel');
+                return;
+            }
+            
+            log('system', 'Canceling scan...');
+            setScanning(false);
+            
+            // Try to cancel on backend
+            fetch(`/api/scan/${currentScanInfo.scan_id}/cancel`, { method: 'POST' })
+                .then(() => log('success', 'Scan canceled'))
+                .catch(err => console.error('Cancel error:', err));
+        }
+        
         function escapeHtml(text){if(!text)return'';const d=document.createElement('div');d.textContent=text;return d.innerHTML}
         document.getElementById('targetUrl').addEventListener('keypress',e=>{if(e.key==='Enter'&&!isScanning)startScan()});
     </script>
     
     <!-- Vulnerability Details Modal -->
     <div id="vuln-modal" class="modal-overlay">
-        <div class="modal ai-modal">
-            <div class="ai-modal-header">
-                <h3 style="margin: 0; font-size: 1.25rem; color: var(--accent);">?? Vulnerability Details</h3>
-                <button id="close-modal" class="modal-close" onclick="document.getElementById('vuln-modal').classList.remove('active')">�</button>
+        <div class="modal ai-modal" style="max-width:900px">
+            <div class="ai-modal-header" style="background:linear-gradient(135deg,rgba(0,212,255,0.15),rgba(124,58,237,0.15));border-bottom:2px solid rgba(0,212,255,0.3);padding:1.25rem 1.5rem">
+                <div style="display:flex;align-items:center;gap:0.75rem">
+                    <div style="width:40px;height:40px;border-radius:10px;background:rgba(0,212,255,0.2);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:var(--accent)">
+                        <i class="fas fa-shield-halved"></i>
+                    </div>
+                    <h3 style="margin:0;font-size:1.3rem;font-weight:700;color:var(--accent)">Vulnerability Analysis</h3>
+                </div>
+                <button id="close-modal" class="modal-close" onclick="document.getElementById('vuln-modal').classList.remove('active')" style="width:36px;height:36px;border-radius:8px;background:rgba(255,59,92,0.15);border:2px solid rgba(255,59,92,0.3);color:var(--critical)">×</button>
             </div>
-            <div id="modal-body" style="padding: 1.5rem; max-height: 70vh; overflow-y: auto;">
+            <div id="modal-body" style="padding:1.5rem;max-height:70vh;overflow-y:auto">
                 <!-- Content will be injected here -->
             </div>
         </div>

@@ -171,6 +171,30 @@ async def handle_scan_status(request: web.Request) -> web.Response:
     })
 
 
+async def handle_scan_cancel(request: web.Request) -> web.Response:
+    """Cancel a running scan."""
+    scan_id = request.match_info.get('scan_id')
+    
+    if scan_id not in active_scans:
+        return web.json_response({'error': 'Scan not found'}, status=404)
+    
+    scan_info = active_scans[scan_id]
+    
+    if scan_info['status'] != 'running':
+        return web.json_response({'error': 'Scan is not running'}, status=400)
+    
+    # Mark as canceled
+    scan_info['status'] = 'canceled'
+    scan_info['progress'] = 100
+    
+    logger.info(f"Scan {scan_id} canceled by user")
+    
+    return web.json_response({
+        'status': 'canceled',
+        'message': 'Scan canceled successfully'
+    })
+
+
 async def handle_scan_result(request: web.Request) -> web.Response:
     """Get the full result of a completed scan."""
     scan_id = request.match_info.get('scan_id')
@@ -1296,6 +1320,7 @@ def create_app() -> web.Application:
     # Routes - Scan API (matching frontend expectations)
     app.router.add_post('/api/scan', handle_scan_start)
     app.router.add_get('/api/status/{scan_id}', handle_scan_status)
+    app.router.add_post('/api/scan/{scan_id}/cancel', handle_scan_cancel)
     app.router.add_get('/api/results/{scan_id}', handle_scan_result)
     app.router.add_get('/api/scans', handle_list_scans)
     app.router.add_post('/api/analyze', handle_analyze_target)
