@@ -15,6 +15,7 @@ import re
 import json
 import time
 import hashlib
+import socket
 from concurrent.futures import ThreadPoolExecutor
 from collections import deque
 
@@ -43,6 +44,7 @@ class VulnerabilityFinding:
     timestamp: datetime = field(default_factory=datetime.now)
     confidence: float = 0.8
     cvss_score: float = 5.0
+    ip_address: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -59,7 +61,8 @@ class VulnerabilityFinding:
             'recommendations': self.recommendations,
             'timestamp': self.timestamp.isoformat(),
             'confidence': self.confidence,
-            'cvss_score': self.cvss_score
+            'cvss_score': self.cvss_score,
+            'ip_address': self.ip_address
         }
 
 
@@ -1430,11 +1433,38 @@ class EnhancedScanner:
                 asyncio.create_task(result)
     
     def _notify_finding(self, finding: VulnerabilityFinding):
-        """Notify about a new finding."""
+        """Notify about a new finding with DNS resolution."""
         self.progress.findings_count += 1
-        logger.info(f"🔴 FOUND: {finding.title} ({finding.severity.value})")
+        
+        # Resolve domain to IP and store in finding
+        if not finding.ip_address:
+            finding.ip_address = self._resolve_dns(finding.url)
+        
+        ip_info = f" → {finding.ip_address}" if finding.ip_address else ""
+        
+        # Log with IP address
+        logger.info(f"🔴 FOUND: {finding.title} ({finding.severity.value}){ip_info}")
+        self._log(f"🔴 {finding.attack_type.value.upper()} → {finding.url}{ip_info}", "success", force_flush=True)
+        
         if self.on_finding:
             result = self.on_finding(finding)
             if asyncio.iscoroutine(result):
                 asyncio.create_task(result)
+    
+    def _resolve_dns(self, url: str) -> Optional[str]:
+        """Resolve domain name to IP address."""
+        try:
+            parsed = urlparse(url)
+            hostname = parsed.netloc.split(':')[0]  # Remove port if present
+            
+            # Skip localhost/127.0.0.1
+            if hostname in ['localhost', '127.0.0.1', '::1']:
+                return None
+            
+            # Resolve DNS
+            ip = socket.gethostbyname(hostname)
+            return ip
+        except (socket.gaierror, socket.herror, Exception) as e:
+            logger.debug(f"DNS resolution failed for {url}: {e}")
+            return None
 

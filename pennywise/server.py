@@ -70,7 +70,7 @@ class PennywiseAPI:
         try:
             from .ai.target_analyzer import AITargetAnalyzer
             import os
-            lora_path = "./lora/analyser/lora"
+            lora_path = "./lora/analyser/lora-adapter"
             if os.path.exists(lora_path):
                 self.ai_analyzer = AITargetAnalyzer(model_path=lora_path)
             else:

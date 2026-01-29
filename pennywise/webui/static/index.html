@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -269,7 +269,7 @@
         .attack-type-card:hover { border-color: rgba(0, 212, 255, 0.3); background: rgba(0, 212, 255, 0.05); transform: translateY(-2px); }
         .attack-type-card.checked { border-color: var(--accent); background: rgba(0, 212, 255, 0.1); box-shadow: 0 0 20px rgba(0, 212, 255, 0.2); }
         .attack-type-card.checked::before { content: ''; position: absolute; top: 0.4rem; right: 0.4rem; width: 18px; height: 18px; background: var(--accent); border-radius: 50%; display: grid; place-items: center; }
-        .attack-type-card.checked::after { content: '✓'; position: absolute; top: 0.4rem; right: 0.4rem; width: 18px; height: 18px; color: #000; font-size: 0.7rem; font-weight: bold; display: grid; place-items: center; z-index: 1; }
+        .attack-type-card.checked::after { content: '?'; position: absolute; top: 0.4rem; right: 0.4rem; width: 18px; height: 18px; color: #000; font-size: 0.7rem; font-weight: bold; display: grid; place-items: center; z-index: 1; }
         .attack-type-icon { width: 36px; height: 36px; background: rgba(0, 212, 255, 0.1); border-radius: 8px; display: grid; place-items: center; font-size: 1rem; margin-bottom: 0.6rem; }
         .attack-type-card.checked .attack-type-icon { background: var(--accent); color: #000; }
         .attack-type-name { font-size: 0.8rem; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: 0.3px; }
@@ -426,7 +426,7 @@
                         <span>Powered by fine-tuned vulnerability detection model</span>
                     </div>
                 </div>
-                <button class="ai-modal-close" onclick="closeAIModal()">×</button>
+                <button class="ai-modal-close" onclick="closeAIModal()">�</button>
             </div>
             
             <div class="ai-analysis-content" id="aiAnalysisContent">
@@ -455,7 +455,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h2 class="modal-title"><i class="fas fa-file-export"></i> Export Report</h2>
-                <button class="modal-close" onclick="closeExportModal()">×</button>
+                <button class="modal-close" onclick="closeExportModal()">�</button>
             </div>
             
             <div class="export-formats">
@@ -972,73 +972,169 @@
         function displayAIAnalysis(data) {
             const analysis = data.analysis;
             const attackTypes = analysis.attack_types || [];
+            const scanSuggestions = analysis.scan_suggestions || attackTypes;
+            const vulnerabilities = analysis.vulnerabilities || [];
+            const overallRisk = analysis.overall_risk || 'unknown';
             const method = analysis.method || 'ai';
             
             let html = '';
             
-            // Show error warning if present with raw response
-            if (analysis.error || method === 'parse-error') {
+            // Overall risk summary - Enhanced
+            if (overallRisk) {
+                const riskConfig = {
+                    'critical': { 
+                        color: '#ff3b5c', 
+                        glow: '#ff3b5c40',
+                        icon: 'skull',
+                        text: 'CRITICAL RISK',
+                        bg: 'linear-gradient(135deg, rgba(255, 59, 92, 0.2), rgba(255, 59, 92, 0.05))'
+                    },
+                    'high': { 
+                        color: '#ff8c42', 
+                        glow: '#ff8c4240',
+                        icon: 'fire',
+                        text: 'HIGH RISK',
+                        bg: 'linear-gradient(135deg, rgba(255, 140, 66, 0.2), rgba(255, 140, 66, 0.05))'
+                    },
+                    'medium': { 
+                        color: '#ffd93d', 
+                        glow: '#ffd93d40',
+                        icon: 'exclamation',
+                        text: 'MEDIUM RISK',
+                        bg: 'linear-gradient(135deg, rgba(255, 217, 61, 0.2), rgba(255, 217, 61, 0.05))'
+                    },
+                    'low': { 
+                        color: '#6bcb77', 
+                        glow: '#6bcb7740',
+                        icon: 'shield-check',
+                        text: 'LOW RISK',
+                        bg: 'linear-gradient(135deg, rgba(107, 203, 119, 0.2), rgba(107, 203, 119, 0.05))'
+                    }
+                };
+                const config = riskConfig[overallRisk] || riskConfig['low'];
                 html += `
-                    <div style="background: rgba(255, 59, 92, 0.1); border: 1px solid rgba(255, 59, 92, 0.3); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.75rem;">
-                        <div style="display: flex; align-items: start; gap: 0.5rem; margin-bottom: 0.5rem;">
-                            <i class="fas fa-exclamation-triangle" style="color: var(--critical); margin-top: 0.1rem;"></i>
+                    <div style="background: ${config.bg}; border: 2px solid ${config.color}; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; position: relative; overflow: hidden; backdrop-filter: blur(10px);">
+                        <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, ${config.color}, transparent);"></div>
+                        <div style="display: flex; align-items: center; gap: 1.25rem;">
+                            <div style="flex-shrink: 0;">
+                                <div style="width: 60px; height: 60px; background: linear-gradient(135deg, ${config.color}, ${config.color}dd); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 0 30px ${config.glow}, inset 0 1px 0 rgba(255,255,255,0.2);">
+                                    <i class="fas fa-${config.icon}"></i>
+                                </div>
+                            </div>
                             <div style="flex: 1;">
-                                <div style="font-weight: 600; color: var(--critical); font-size: 0.85rem; margin-bottom: 0.25rem;">Failed to Parse AI Response</div>
-                                <div style="color: var(--text-secondary); font-size: 0.75rem;">${escapeHtml(analysis.error || 'Unknown parsing error')}</div>
-                                <div style="color: var(--text-muted); font-size: 0.7rem; margin-top: 0.25rem;">Using default scan recommendations (XSS, SQLi, CSRF)</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 0.4rem;">Overall Assessment</div>
+                                <div style="font-size: 1.4rem; font-weight: 800; color: ${config.color}; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">${config.text}</div>
+                                <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.6rem; line-height: 1.5;">
+                                    Found <strong style="color: ${config.color};">${vulnerabilities.length}</strong> vulnerability candidate(s). 
+                                    <br>Recommended scans: <strong style="color: var(--accent);">${scanSuggestions.map(s => s.toUpperCase()).join(' | ')}</strong>
+                                </div>
                             </div>
                         </div>
-                        ${analysis.raw_response ? `
-                            <details style="margin-top: 0.5rem;">
-                                <summary style="color: var(--accent); font-size: 0.75rem; cursor: pointer; user-select: none; padding: 0.25rem 0;">
-                                    <i class="fas fa-code"></i> View Raw AI Response
-                                </summary>
-                                <pre style="background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 59, 92, 0.3); border-radius: 4px; padding: 0.5rem; font-size: 0.65rem; color: var(--text-secondary); overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; line-height: 1.3; font-family: 'JetBrains Mono', monospace; max-height: 150px; overflow-y: auto; margin-top: 0.5rem;">${escapeHtml(analysis.raw_response)}</pre>
-                            </details>
-                        ` : ''}
                     </div>
                 `;
             }
             
-            // Show parsed output only if no critical error
-            if (method !== 'parse-error') {
-                html += `
-                    <div class="ai-vuln-section" style="margin-bottom: 0.75rem;">
-                        <div class="ai-section-header">
-                            <i class="fas fa-${method === 'ai' ? 'robot' : (method === 'fallback' ? 'shield-halved' : 'cogs')}"></i>
-                            <h3>Parsed Analysis ${method === 'fallback' ? '(Fallback Mode)' : ''}</h3>
+            // Vulnerabilities as enhanced cards
+            if (vulnerabilities.length > 0) {
+                html += `<div style="margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(0, 212, 255, 0.2);">
+                        <i class="fas fa-bug" style="color: var(--accent); font-size: 0.9rem;"></i>
+                        <h3 style="font-size: 0.85rem; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.3px; margin: 0;">Vulnerabilities</h3>
+                        <span style="background: rgba(0, 212, 255, 0.15); padding: 0.2rem 0.5rem; border-radius: 10px; font-size: 0.7rem; font-weight: 600; color: var(--accent); margin-left: auto;">${vulnerabilities.length}</span>
+                    </div>
+                `;
+                
+                vulnerabilities.forEach((vuln, idx) => {
+                    const vulnType = vuln.type || 'unknown';
+                    const severity = vuln.severity || 'low';
+                    
+                    const typeIcons = {
+                        'xss': 'code',
+                        'sqli': 'database',
+                        'csrf': 'shield-halved',
+                        'idor': 'users',
+                        'auth': 'lock-open',
+                        'cors': 'globe',
+                        'rce': 'terminal',
+                        'lfi': 'folder-open',
+                        'open_redirect': 'arrow-up-right-from-square',
+                        'file_upload': 'upload',
+                        'directory_listing': 'list',
+                        'insecure_headers': 'list-check'
+                    };
+                    
+                    const severityConfig = {
+                        'critical': { color: '#ff3b5c', light: 'rgba(255, 59, 92, 0.1)', border: 'rgba(255, 59, 92, 0.4)', accent: '#ff1744' },
+                        'high': { color: '#ff8c42', light: 'rgba(255, 140, 66, 0.1)', border: 'rgba(255, 140, 66, 0.4)', accent: '#ff6d00' },
+                        'medium': { color: '#ffd93d', light: 'rgba(255, 217, 61, 0.1)', border: 'rgba(255, 217, 61, 0.4)', accent: '#ffb300' },
+                        'low': { color: '#6bcb77', light: 'rgba(107, 203, 119, 0.1)', border: 'rgba(107, 203, 119, 0.4)', accent: '#00e676' }
+                    };
+                    const colors = severityConfig[severity] || severityConfig['low'];
+                    const icon = typeIcons[vulnType.toLowerCase()] || 'exclamation-circle';
+                    
+                    html += `
+                        <div style="background: ${colors.light}; border-left: 3px solid ${colors.color}; border-radius: 8px; padding: 0.85rem; margin-bottom: 0.6rem; transition: all 0.2s ease;">
+                            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+                                <div style="flex-shrink: 0; width: 32px; height: 32px; background: ${colors.color}20; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: ${colors.color};">
+                                    <i class="fas fa-${icon}"></i>
+                                </div>
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+                                        <div style="font-weight: 700; color: var(--text); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.3px;">${escapeHtml(vulnType)}</div>
+                                        <div style="background: ${colors.color}; color: #000; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; margin-left: auto;">${severity}</div>
+                                    </div>
+                                    <div style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.5rem; line-height: 1.4;">${escapeHtml(vuln.description || 'Vulnerability detected')}</div>
+                                    ${vuln.ip_address ? `
+                                        <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem; padding: 0.4rem 0.6rem; background: rgba(0, 212, 255, 0.1); border-radius: 4px; border: 1px solid rgba(0, 212, 255, 0.2);">
+                                            <i class="fas fa-network-wired" style="color: var(--accent); font-size: 0.75rem;"></i>
+                                            <span style="font-size: 0.75rem; color: var(--accent); font-family: 'JetBrains Mono', monospace; font-weight: 600;">${escapeHtml(vuln.ip_address)}</span>
+                                        </div>
+                                    ` : ''}
+                                    ${vuln.evidence ? `
+                                        <div style="background: rgba(0, 0, 0, 0.15); border-left: 2px solid ${colors.color}; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;">
+                                            <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.2px; font-weight: 600; margin-bottom: 0.3rem;">Evidence</div>
+                                            <div style="font-size: 0.75rem; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; line-height: 1.4; word-break: break-word;">${escapeHtml(vuln.evidence)}</div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
                         </div>
-                        <pre style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(0, 212, 255, 0.2); border-radius: 6px; padding: 0.65rem; font-size: 0.7rem; color: var(--text-secondary); overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; line-height: 1.4; font-family: 'JetBrains Mono', monospace; max-height: 180px; overflow-y: auto;\">${escapeHtml(JSON.stringify(analysis, null, 2))}</pre>
-                    </div>
-                `;
+                    `;
+                });
+                html += `</div>`;
             }
             
-            // Recommended Attack Types - Compact Grid
+            // Recommended Attack Types - Enhanced Grid
             html += `
-                <div class="ai-vuln-section">
-                    <div class="ai-section-header">
-                        <i class="fas fa-crosshairs"></i>
-                        <h3>Recommended Security Scans</h3>
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(0, 212, 255, 0.2);">
+                        <i class="fas fa-crosshairs" style="color: var(--accent); font-size: 0.9rem;"></i>
+                        <h3 style="font-size: 0.85rem; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.3px; margin: 0;">Recommended Scans</h3>
                     </div>
-                    <div class="ai-attack-grid">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.6rem;">
             `;
             
             const attackTypeConfig = {
-                'xss': { icon: 'code', name: 'XSS' },
-                'sqli': { icon: 'database', name: 'SQL Injection' },
-                'csrf': { icon: 'shield-alt', name: 'CSRF' },
-                'lfi': { icon: 'folder-open', name: 'LFI' },
-                'rce': { icon: 'terminal', name: 'RCE' }
+                'xss': { icon: 'code', name: 'XSS', desc: 'Script Injection' },
+                'sqli': { icon: 'database', name: 'SQL Injection', desc: 'Database Attack' },
+                'csrf': { icon: 'shield-alt', name: 'CSRF', desc: 'Request Forgery' },
+                'idor': { icon: 'users', name: 'IDOR', desc: 'Access Control' },
+                'lfi': { icon: 'folder-open', name: 'LFI', desc: 'File Inclusion' },
+                'rce': { icon: 'terminal', name: 'RCE', desc: 'Code Execution' },
+                'auth': { icon: 'lock', name: 'Auth', desc: 'Authentication' },
+                'cors': { icon: 'globe', name: 'CORS', desc: 'Cross-Origin' }
             };
             
             Object.entries(attackTypeConfig).forEach(([type, config]) => {
-                const checked = attackTypes.includes(type);
+                const checked = scanSuggestions.includes(type);
                 html += `
-                    <div class="attack-type-card ${checked ? 'checked' : ''}" onclick="toggleAIAttackType('${type}', this)">
-                        <div class="attack-type-icon">
+                    <div class="attack-type-card ${checked ? 'checked' : ''}" onclick="toggleAIAttackType('${type}', this)" style="background: ${checked ? 'linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(124, 58, 237, 0.15))' : 'rgba(0, 0, 0, 0.3)'}; border: 2px solid ${checked ? 'var(--accent)' : 'rgba(255, 255, 255, 0.1)'}; border-radius: 8px; padding: 0.75rem; cursor: pointer; transition: all 0.2s ease; position: relative; text-align: center;">
+                        <div style="width: 32px; height: 32px; background: ${checked ? 'var(--accent)' : 'rgba(0, 212, 255, 0.2)'}; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: ${checked ? '#000' : 'var(--accent)'}; margin: 0 auto 0.5rem; transition: all 0.2s;">
                             <i class="fas fa-${config.icon}"></i>
                         </div>
-                        <div class="attack-type-name">${config.name}</div>
+                        <div style="font-weight: 700; color: var(--text); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.2px; margin-bottom: 0.2rem;">${config.name}</div>
+                        <div style="font-size: 0.65rem; color: var(--text-muted);">${config.desc}</div>
+                        ${checked ? '<div style="position: absolute; top: 0.4rem; right: 0.4rem; width: 16px; height: 16px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #000; font-size: 0.7rem; font-weight: bold;">✓</div>' : ''}
                     </div>
                 `;
             });
@@ -1289,7 +1385,7 @@
                         btn.style.background = 'rgba(124, 58, 237, 0.2)';
                         btn.style.borderColor = 'rgba(124, 58, 237, 0.5)';
                         btn.style.color = 'var(--accent-secondary)';
-                        log('success', `🎓 Training session started: ${data.session_id.substring(0,8)}...`);
+                        log('success', `?? Training session started: ${data.session_id.substring(0,8)}...`);
                         
                         // Start polling for stats
                         trainingStatsInterval = setInterval(updateTrainingStats, 2000);
@@ -1297,7 +1393,7 @@
                     }
                 } catch (error) {
                     console.error('Failed to start training:', error);
-                    log('critical', '❌ Failed to start training session');
+                    log('critical', '? Failed to start training session');
                 }
             } else {
                 // End training session
@@ -1320,7 +1416,7 @@
                             trainingStatsInterval = null;
                         }
                         
-                        log('success', `✅ Training complete: ${summary.total_actions || 0} actions, ${summary.successful_actions || 0} successes`);
+                        log('success', `? Training complete: ${summary.total_actions || 0} actions, ${summary.successful_actions || 0} successes`);
                         trainingSessionId = null;
                     }
                 } catch (error) {
@@ -1364,21 +1460,21 @@
             list.innerHTML = recommendations.slice(0, 5).map(rec => `
                 <div class="recommendation-item" onclick="applyRecommendation('${escapeHtml(rec.payload)}')">
                     <span class="recommendation-payload">${escapeHtml(rec.payload)}</span>
-                    <span class="recommendation-score">${rec.count}×</span>
+                    <span class="recommendation-score">${rec.count}�</span>
                 </div>
             `).join('');
         }
         
         function applyRecommendation(payload) {
             document.getElementById('trainPayload').value = payload;
-            log('info', `💡 Applied recommended payload: ${payload}`);
+            log('info', `?? Applied recommended payload: ${payload}`);
         }
         
         let lastTestedPayload = null;
         
         async function testManualPayload() {
             if (!trainingActive) {
-                log('system', '⚠️ Start training mode first');
+                log('system', '?? Start training mode first');
                 return;
             }
             
@@ -1386,25 +1482,25 @@
             const payload = document.getElementById('trainPayload').value.trim();
             
             if (!payload) {
-                log('system', '⚠️ Enter a payload to test');
+                log('system', '?? Enter a payload to test');
                 return;
             }
             
             lastTestedPayload = {attackType, payload, time: Date.now()};
-            log('info', `🧪 Testing ${attackType} payload: ${payload}`);
-            log('system', '⚠️ Test the payload manually, then click Success or Failed');
+            log('info', `?? Testing ${attackType} payload: ${payload}`);
+            log('system', '?? Test the payload manually, then click Success or Failed');
         }
         
         async function recordSuccess() {
             if (!trainingActive) return;
             if (!lastTestedPayload) {
-                log('system', '⚠️ Test a payload first');
+                log('system', '?? Test a payload first');
                 return;
             }
             
             const responseTime = (Date.now() - lastTestedPayload.time) / 1000;
             await recordTrainingAction(lastTestedPayload.attackType, lastTestedPayload.payload, true, responseTime);
-            log('success', `✅ Recorded successful ${lastTestedPayload.attackType}: ${lastTestedPayload.payload}`);
+            log('success', `? Recorded successful ${lastTestedPayload.attackType}: ${lastTestedPayload.payload}`);
             document.getElementById('trainPayload').value = '';
             lastTestedPayload = null;
         }
@@ -1412,13 +1508,13 @@
         async function recordFailure() {
             if (!trainingActive) return;
             if (!lastTestedPayload) {
-                log('system', '⚠️ Test a payload first');
+                log('system', '?? Test a payload first');
                 return;
             }
             
             const responseTime = (Date.now() - lastTestedPayload.time) / 1000;
             await recordTrainingAction(lastTestedPayload.attackType, lastTestedPayload.payload, false, responseTime);
-            log('system', `❌ Recorded failed ${lastTestedPayload.attackType}: ${lastTestedPayload.payload}`);
+            log('system', `? Recorded failed ${lastTestedPayload.attackType}: ${lastTestedPayload.payload}`);
             document.getElementById('trainPayload').value = '';
             lastTestedPayload = null;
         }
@@ -1453,8 +1549,8 @@
     <div id="vuln-modal" class="modal-overlay">
         <div class="modal ai-modal">
             <div class="ai-modal-header">
-                <h3 style="margin: 0; font-size: 1.25rem; color: var(--accent);">🔍 Vulnerability Details</h3>
-                <button id="close-modal" class="modal-close" onclick="document.getElementById('vuln-modal').classList.remove('active')">×</button>
+                <h3 style="margin: 0; font-size: 1.25rem; color: var(--accent);">?? Vulnerability Details</h3>
+                <button id="close-modal" class="modal-close" onclick="document.getElementById('vuln-modal').classList.remove('active')">�</button>
             </div>
             <div id="modal-body" style="padding: 1.5rem; max-height: 70vh; overflow-y: auto;">
                 <!-- Content will be injected here -->

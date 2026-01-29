@@ -14,6 +14,7 @@ import logging
 import re
 import json
 import time
+import socket
 from collections import deque
 
 from ..config import AttackType, SeverityLevel, ScanConfig, PennywiseConfig
@@ -40,6 +41,7 @@ class Finding:
     recommendations: List[str] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now)
     confidence: float = 0.8
+    ip_address: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -54,7 +56,8 @@ class Finding:
             'evidence': self.evidence,
             'recommendations': self.recommendations,
             'timestamp': self.timestamp.isoformat(),
-            'confidence': self.confidence
+            'confidence': self.confidence,
+            'ip_address': self.ip_address
         }
 
 
@@ -742,7 +745,29 @@ class VulnerabilityScanner:
             self.on_progress(message, current, total)
     
     def _notify_finding(self, finding: Finding):
-        """Notify about a new finding via callback."""
-        logger.info(f"Finding: {finding.title} ({finding.severity.value})")
+        """Notify about a new finding via callback with DNS resolution."""
+        # Resolve domain to IP and store in finding
+        if not finding.ip_address:
+            finding.ip_address = self._resolve_dns(finding.url)
+        
+        ip_info = f" → {finding.ip_address}" if finding.ip_address else ""
+        logger.info(f"Finding: {finding.title} ({finding.severity.value}){ip_info}")
         if self.on_finding:
             self.on_finding(finding)
+    
+    def _resolve_dns(self, url: str) -> Optional[str]:
+        """Resolve domain name to IP address."""
+        try:
+            parsed = urlparse(url)
+            hostname = parsed.netloc.split(':')[0]  # Remove port if present
+            
+            # Skip localhost/127.0.0.1
+            if hostname in ['localhost', '127.0.0.1', '::1']:
+                return None
+            
+            # Resolve DNS
+            ip = socket.gethostbyname(hostname)
+            return ip
+        except (socket.gaierror, socket.herror, Exception) as e:
+            logger.debug(f"DNS resolution failed for {url}: {e}")
+            return None

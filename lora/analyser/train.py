@@ -127,7 +127,7 @@ if USE_GRADIENT_CHECKPOINTING:
 # =========================
 
 lora_config = LoraConfig(
-    r=8,                  # Reduced from 16 to save memory
+    r=16,                  # Reduced from 16 to save memory
     lora_alpha=16,        # Reduced from 32
     target_modules=[
         "q_proj",
@@ -138,6 +138,12 @@ lora_config = LoraConfig(
     task_type="CAUSAL_LM",
 )
 print("📊 LoRA config: r=8, alpha=16, 2 target modules")
+
+# Clean up old adapter if it exists (to avoid weight shape mismatch)
+import shutil
+if os.path.exists("./lora-adapter"):
+    print("🧹 Removing old LoRA adapter to prevent weight mismatch...")
+    shutil.rmtree("./lora-adapter")
 
 model = get_peft_model(model, lora_config)
 model.print_trainable_parameters()
@@ -360,7 +366,7 @@ if 'eval_accuracy' in eval_results:
     print(f"Token Accuracy: {eval_results['eval_accuracy']*100:.2f}%")
 print(f"Training Samples: {len(dataset)}")
 print(f"Evaluation Samples: {len(eval_dataset)}")
-print(f"Epochs Completed: {train_result.epoch}")
+#print(f"Epochs Completed: {train_result.epoch}")
 print("="*60)
 print(f"✅ Metrics saved to: ./lora-out/training_metrics.json")
 print("="*60)
