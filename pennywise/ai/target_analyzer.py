@@ -89,24 +89,36 @@ class AITargetAnalyzer:
                 BitsAndBytesConfig,
             )
 
-            torch.backends.cuda.matmul.allow_tf32 = True
-            torch.backends.cudnn.allow_tf32 = True
+            use_cuda = torch.cuda.is_available()
 
-            quantization_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16,
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_quant_type="nf4",
-            )
-            model_id = "Qwen/Qwen3-1.7B"
+            if use_cuda:
+                torch.backends.cuda.matmul.allow_tf32 = True
+                torch.backends.cudnn.allow_tf32 = True
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.float16,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4",
+                )
+                load_kwargs = {
+                    "device_map": {"": 0},
+                    "quantization_config": quantization_config,
+                    "low_cpu_mem_usage": True,
+                }
+            else:
+                load_kwargs = {
+                    "device_map": "cpu",
+                    "torch_dtype": torch.float32,
+                    "low_cpu_mem_usage": True,
+                }
+
+            model_id = "Qwen/Qwen3.5-2B"
 
             tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
             model = AutoModelForCausalLM.from_pretrained(
                 model_id,
-                device_map={"": 0},
                 trust_remote_code=True,
-                quantization_config=quantization_config,
-                low_cpu_mem_usage=True,
+                **load_kwargs,
             )
             model.config.use_cache = False
             self.tokenizer = tokenizer
