@@ -314,7 +314,7 @@
     <div class="bg-effects"><div class="bg-gradient bg-gradient-1"></div><div class="bg-gradient bg-gradient-2"></div><div class="noise"></div></div>
     <div class="app">
         <header class="header">
-            <div class="brand"><div class="brand-icon"><i class="fas fa-shield-halved"></i></div><div class="brand-name"><span>Penny</span>Wise</div></div>
+            <div class="brand"><div class="brand-icon"><i class="fas fa-shield-alt"></i></div><div class="brand-name"><span>Penny</span>Wise</div></div>
             <div class="status-pill"><div class="status-dot" id="statusDot"></div><span id="statusText">Ready</span></div>
         </header>
         <div class="card control-card">
@@ -418,7 +418,7 @@
                 <div class="phase-indicator" id="phaseIndicator" style="display:none"><div class="phase-dot"></div><span id="phaseText">Initializing...</span></div>
             </div>
             <div class="log-feed" id="logFeed">
-                <div class="empty-state" id="emptyState"><div class="empty-icon"><i class="fas fa-shield-halved"></i></div><div class="empty-text">Enter a target URL and start scanning to see vulnerabilities appear here</div></div>
+                <div class="empty-state" id="emptyState"><div class="empty-icon"><i class="fas fa-shield-alt"></i></div><div class="empty-text">Enter a target URL and start scanning to see vulnerabilities appear here</div></div>
             </div>
         </div>
     </div>
@@ -520,13 +520,13 @@
             // Terminal-style icons and prefixes
             const iconMap = {
                 'system': '<i class="fas fa-terminal"></i>',
-                'info': '<i class="fas fa-circle-info"></i>',
+                'info': '<i class="fas fa-info-circle"></i>',
                 'critical': '<i class="fas fa-skull-crossbones"></i>',
-                'high': '<i class="fas fa-radiation"></i>',
-                'medium': '<i class="fas fa-triangle-exclamation"></i>',
-                'low': '<i class="fas fa-circle-exclamation"></i>',
+                'high': '<i class="fas fa-bolt"></i>',
+                'medium': '<i class="fas fa-exclamation-triangle"></i>',
+                'low': '<i class="fas fa-exclamation-circle"></i>',
                 'url': '<i class="fas fa-link"></i>',
-                'success': '<i class="fas fa-circle-check"></i>'
+                'success': '<i class="fas fa-check-circle"></i>'
             };
             const prefixMap = {
                 'system': '[SYS]',
@@ -1007,7 +1007,7 @@
                     'critical': { 
                         color: '#ff3b5c', 
                         glow: '#ff3b5c40',
-                        icon: 'skull',
+                        icon: 'skull-crossbones',
                         text: 'CRITICAL RISK',
                         bg: 'linear-gradient(135deg, rgba(255, 59, 92, 0.2), rgba(255, 59, 92, 0.05))'
                     },
@@ -1021,14 +1021,14 @@
                     'medium': { 
                         color: '#ffd93d', 
                         glow: '#ffd93d40',
-                        icon: 'exclamation',
+                        icon: 'exclamation-triangle',
                         text: 'MEDIUM RISK',
                         bg: 'linear-gradient(135deg, rgba(255, 217, 61, 0.2), rgba(255, 217, 61, 0.05))'
                     },
                     'low': { 
                         color: '#6bcb77', 
                         glow: '#6bcb7740',
-                        icon: 'shield-check',
+                        icon: 'shield-alt',
                         text: 'LOW RISK',
                         bg: 'linear-gradient(135deg, rgba(107, 203, 119, 0.2), rgba(107, 203, 119, 0.05))'
                     }
@@ -1073,16 +1073,19 @@
                     const typeIcons = {
                         'xss': 'code',
                         'sqli': 'database',
-                        'csrf': 'shield-halved',
+                        'csrf': 'shield-alt',
                         'idor': 'users',
-                        'auth': 'lock-open',
+                        'auth': 'unlock',
                         'cors': 'globe',
                         'rce': 'terminal',
                         'lfi': 'folder-open',
-                        'open_redirect': 'arrow-up-right-from-square',
+                        'open_redirect': 'external-link-alt',
                         'file_upload': 'upload',
                         'directory_listing': 'list',
-                        'insecure_headers': 'list-check'
+                        'insecure_headers': 'tasks',
+                        'ssrf': 'network-wired',
+                        'xxe': 'file-code',
+                        'rfi': 'file-import'
                     };
                     
                     const severityConfig = {
@@ -1144,7 +1147,12 @@
                 'lfi': { icon: 'folder-open', name: 'LFI', desc: 'File Inclusion' },
                 'rce': { icon: 'terminal', name: 'RCE', desc: 'Code Execution' },
                 'auth': { icon: 'lock', name: 'Auth', desc: 'Authentication' },
-                'cors': { icon: 'globe', name: 'CORS', desc: 'Cross-Origin' }
+                'cors': { icon: 'globe', name: 'CORS', desc: 'Cross-Origin' },
+                'ssrf': { icon: 'network-wired', name: 'SSRF', desc: 'Server-Side RF' },
+                'open_redirect': { icon: 'external-link-alt', name: 'Open Redirect', desc: 'URL Redirect' },
+                'insecure_headers': { icon: 'tasks', name: 'Headers', desc: 'Sec Headers' },
+                'file_upload': { icon: 'upload', name: 'File Upload', desc: 'Upload Vuln' },
+                'directory_listing': { icon: 'list', name: 'Dir Listing', desc: 'Dir Exposure' }
             };
             
             Object.entries(attackTypeConfig).forEach(([type, config]) => {
@@ -1553,7 +1561,7 @@
             <div class="ai-modal-header" style="background:linear-gradient(135deg,rgba(0,212,255,0.1),rgba(124,58,237,0.08));border-bottom:1px solid rgba(0,212,255,0.2);padding:2rem;display:flex;align-items:center;justify-content:space-between">
                 <div style="display:flex;align-items:center;gap:1rem">
                     <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,rgba(0,212,255,0.25),rgba(124,58,237,0.25));border:1.5px solid rgba(0,212,255,0.4);display:flex;align-items:center;justify-content:center;font-size:1.25rem;color:var(--accent)">
-                        <i class="fas fa-shield-halved"></i>
+                        <i class="fas fa-shield-alt"></i>
                     </div>
                     <div>
                         <h3 style="margin:0;font-size:1.35rem;font-weight:700;color:var(--text);letter-spacing:-0.01em">Security Assessment</h3>

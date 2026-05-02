@@ -428,6 +428,10 @@ class PennywiseAPI:
                 tech_stack.append('Vue.js')
             
             # Run AI analysis
+            self.logger.info(f"[AI Analyze] Starting analysis for: {url}")
+            self.logger.info(f"[AI Analyze] Forms detected: {len(forms)}, Tech stack: {tech_stack}")
+            self.logger.info(f"[AI Analyze] AI model available: {self.ai_analyzer.model_available}")
+
             analysis_result = await self.ai_analyzer.analyze_target(
                 url=url,
                 html_content=html_content,
@@ -435,7 +439,14 @@ class PennywiseAPI:
                 forms=forms,
                 tech_stack=tech_stack
             )
-            
+
+            self.logger.info(
+                f"[AI Analyze] Result — method: {analysis_result.get('method', '?')}, "
+                f"risk: {analysis_result.get('overall_risk', '?')}, "
+                f"vulns: {len(analysis_result.get('vulnerabilities', []))}, "
+                f"attacks: {analysis_result.get('attack_types', [])}"
+            )
+
             # Check if analysis was successful
             if not analysis_result.get('success', True):
                 # AI failed, but we still return results with fallback
