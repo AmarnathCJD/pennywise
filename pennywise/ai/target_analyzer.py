@@ -179,7 +179,7 @@ class AITargetAnalyzer:
         )
         try:
             async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=90)
+                timeout=aiohttp.ClientTimeout(total=5, connect=2)
             ) as session:
                 async with session.post(
                     "http://127.0.0.1:8090/classify",
@@ -253,8 +253,7 @@ TECH_STACK: {tech_summary}
             with torch.no_grad():
                 outputs = self.model.generate(
                     **inputs,
-                    max_new_tokens=1024,
-                    temperature=0.1,
+                    max_new_tokens=512,
                     do_sample=False,
                     pad_token_id=self.tokenizer.eos_token_id,
                 )
