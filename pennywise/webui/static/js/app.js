@@ -550,6 +550,21 @@ class PennyWiseApp {
                     <pre style="background: var(--color-bg-primary); padding: var(--spacing-md); border-radius: var(--radius-md); overflow-x: auto; font-size: 12px; max-height: 200px; color: var(--color-success);">${this.escapeHtml(vuln.db_structure)}</pre>
                 </div>
                 ` : ''}
+                ${vuln.dumped_data ? `
+                <div class="detail-section full-width">
+                    <div class="db-dump-section">
+                        <h4>💾 Database Dump (Sensitive Data)</h4>
+                        <div class="db-dump-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span>Sensitive data was successfully extracted from the database</span>
+                        </div>
+                        <pre class="db-dump-content"><code>${this.escapeHtml(vuln.dumped_data)}</code></pre>
+                        <button onclick="copyToClipboard('${this.escapeHtml(vuln.dumped_data)}', 'dump')" class="copy-dump-btn">
+                            <i class="fas fa-copy"></i> Copy Data
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
                 
                 ${classification ? `
                 <div class="detail-section full-width ai-insight-card">
@@ -582,24 +597,53 @@ class PennyWiseApp {
                 `}
                 
                 ${remediation ? `
-                <div class="detail-section full-width ai-insight-card">
-                    <div class="ai-header">
-                        <h4>🛡️ AI Remediation Guide</h4>
-                        <span class="ai-badge">${remediation.method || 'rule-based'}</span>
-                    </div>
-                    <div class="remediation-content">
-                        <div class="priority-badge priority-${remediation.priority?.toLowerCase() || 'medium'}">
-                            Priority: ${remediation.priority || 'Medium'}
+                <div class="detail-section full-width">
+                    <div class="remedy-section-header">
+                        <div class="remedy-header-left">
+                            <h4>Security Remediation</h4>
+                            <span class="remedy-method-badge">${remediation.method || 'rule-based'}</span>
                         </div>
-                        ${remediation.steps && remediation.steps.length > 0 ? `
-                        <ol class="remedy-steps">
-                            ${remediation.steps.map(step => `<li>${step}</li>`).join('')}
-                        </ol>
+                        <div class="priority-badge priority-${remediation.priority?.toLowerCase() || 'medium'}">
+                            ${remediation.priority || 'Medium'}
+                        </div>
+                    </div>
+                    
+                    <div class="remedy-sections">
+                        ${remediation.recommendation ? `
+                        <div class="remedy-subsection">
+                            <div class="subsection-title">
+                                <i class="fas fa-lightbulb"></i> Recommendation
+                            </div>
+                            <p class="subsection-content">${remediation.recommendation}</p>
+                        </div>
                         ` : ''}
+                        
+                        ${remediation.steps && remediation.steps.length > 0 ? `
+                        <div class="remedy-subsection">
+                            <div class="subsection-title">
+                                <i class="fas fa-tasks"></i> Fix Steps
+                            </div>
+                            <ol class="remedy-steps">
+                                ${remediation.steps.map((step, i) => `<li><span class="step-number">${i + 1}</span>${step}</li>`).join('')}
+                            </ol>
+                        </div>
+                        ` : ''}
+                        
+                        ${remediation.details ? `
+                        <div class="remedy-subsection">
+                            <div class="subsection-title">
+                                <i class="fas fa-info-circle"></i> Technical Details
+                            </div>
+                            <p class="subsection-content details-text">${remediation.details}</p>
+                        </div>
+                        ` : ''}
+                        
                         ${remediation.code_example ? `
-                        <div class="code-example">
-                            <h5>Code Example:</h5>
-                            <pre>${this.escapeHtml(remediation.code_example)}</pre>
+                        <div class="remedy-subsection">
+                            <div class="subsection-title">
+                                <i class="fas fa-code"></i> Secure Code Example
+                            </div>
+                            <pre class="code-block"><code>${this.escapeHtml(remediation.code_example)}</code></pre>
                         </div>
                         ` : ''}
                     </div>
@@ -608,7 +652,7 @@ class PennyWiseApp {
                 <div class="detail-section full-width" id="remediation-loading">
                     <div class="loading-card">
                         <div class="spinner"></div>
-                        <span>Loading AI remediation guide...</span>
+                        <span>Loading remediation guidance...</span>
                     </div>
                 </div>
                 `}
@@ -677,54 +721,35 @@ class PennyWiseApp {
                 }
                 .priority-badge {
                     display: inline-block;
-                    padding: 0.35rem 0.75rem;
+                    padding: 0.5rem 1rem;
                     border-radius: 8px;
                     font-size: 0.75rem;
-                    font-weight: 600;
+                    font-weight: 700;
                     text-transform: uppercase;
                     letter-spacing: 0.05em;
                     width: fit-content;
                 }
                 .priority-badge.priority-critical {
-                    background: rgba(255, 59, 92, 0.2);
-                    color: var(--critical);
+                    background: rgba(255, 59, 92, 0.25);
+                    color: #ff3b5c;
+                    border: 1px solid rgba(255, 59, 92, 0.5);
                 }
                 .priority-badge.priority-high {
-                    background: rgba(255, 140, 66, 0.2);
-                    color: var(--high);
+                    background: rgba(255, 140, 66, 0.25);
+                    color: #ff8c42;
+                    border: 1px solid rgba(255, 140, 66, 0.5);
                 }
                 .priority-badge.priority-medium {
-                    background: rgba(255, 217, 61, 0.2);
-                    color: var(--medium);
+                    background: rgba(255, 217, 61, 0.25);
+                    color: #ffd93d;
+                    border: 1px solid rgba(255, 217, 61, 0.5);
                 }
-                .remedy-steps {
-                    margin: 0;
-                    padding-left: 1.5rem;
-                    color: var(--text-secondary);
+                .priority-badge.priority-low {
+                    background: rgba(107, 203, 119, 0.25);
+                    color: #6bcb77;
+                    border: 1px solid rgba(107, 203, 119, 0.5);
                 }
-                .remedy-steps li {
-                    margin-bottom: 0.5rem;
-                    font-size: 0.875rem;
-                    line-height: 1.6;
-                }
-                .code-example {
-                    margin-top: 0.5rem;
-                }
-                .code-example h5 {
-                    font-size: 0.75rem;
-                    color: var(--text-muted);
-                    margin-bottom: 0.5rem;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                }
-                .code-example pre {
-                    background: var(--color-bg-primary);
-                    padding: 0.75rem;
-                    border-radius: 8px;
-                    font-size: 0.75rem;
-                    overflow-x: auto;
-                    border: 1px solid var(--border);
-                }
+
                 .loading-card {
                     display: flex;
                     align-items: center;
@@ -745,6 +770,195 @@ class PennyWiseApp {
                 }
                 @keyframes spin {
                     to { transform: rotate(360deg); }
+                }
+                /* New Remediation Section Styles */
+                .remedy-section-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 1.5rem;
+                    padding-bottom: 1rem;
+                    border-bottom: 2px solid rgba(0, 212, 255, 0.2);
+                }
+                .remedy-header-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                }
+                .remedy-header-left h4 {
+                    font-size: 1rem;
+                    font-weight: 600;
+                    color: var(--text);
+                    margin: 0;
+                    text-transform: capitalize;
+                }
+                .remedy-method-badge {
+                    font-size: 0.65rem;
+                    padding: 0.3rem 0.6rem;
+                    background: rgba(124, 58, 237, 0.25);
+                    color: #a78bfa;
+                    border-radius: 6px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    font-weight: 600;
+                }
+                .remedy-sections {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                }
+                .remedy-subsection {
+                    background: linear-gradient(135deg, rgba(0, 212, 255, 0.03), rgba(124, 58, 237, 0.02));
+                    border: 1px solid rgba(0, 212, 255, 0.15);
+                    border-radius: 10px;
+                    padding: 1.25rem;
+                    transition: all 0.3s ease;
+                }
+                .remedy-subsection:hover {
+                    border-color: rgba(0, 212, 255, 0.3);
+                    background: linear-gradient(135deg, rgba(0, 212, 255, 0.05), rgba(124, 58, 237, 0.03));
+                }
+                .subsection-title {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.6rem;
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    color: var(--text);
+                    margin-bottom: 0.75rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.02em;
+                }
+                .subsection-title i {
+                    font-size: 0.95rem;
+                    color: var(--accent);
+                }
+                .subsection-content {
+                    color: var(--text-secondary);
+                    line-height: 1.7;
+                    font-size: 0.875rem;
+                    margin: 0;
+                }
+                .details-text {
+                    color: #d1d5db;
+                }
+                .remedy-steps {
+                    margin: 0;
+                    padding: 0;
+                    list-style: none;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                }
+                .remedy-steps li {
+                    display: flex;
+                    gap: 1rem;
+                    font-size: 0.875rem;
+                    line-height: 1.6;
+                    color: var(--text-secondary);
+                    align-items: flex-start;
+                }
+                .step-number {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 28px;
+                    height: 28px;
+                    background: rgba(0, 212, 255, 0.15);
+                    border: 2px solid rgba(0, 212, 255, 0.3);
+                    border-radius: 50%;
+                    color: var(--accent);
+                    font-weight: 700;
+                    font-size: 0.8rem;
+                    flex-shrink: 0;
+                }
+                .code-block {
+                    background: rgba(0, 0, 0, 0.5);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 8px;
+                    padding: 1rem;
+                    overflow-x: auto;
+                    font-family: 'JetBrains Mono', monospace;
+                    font-size: 0.8rem;
+                    line-height: 1.5;
+                    color: #d4d4d8;
+                    margin: 0;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
+                .code-block code {
+                    color: inherit;
+                    font-family: inherit;
+                }
+                /* Database Dump Styling */
+                .db-dump-section {
+                    background: linear-gradient(135deg, rgba(255, 59, 92, 0.08), rgba(255, 59, 92, 0.04));
+                    border: 2px solid rgba(255, 59, 92, 0.4);
+                    border-radius: 10px;
+                    padding: 1.25rem;
+                    overflow: hidden;
+                }
+                .db-dump-section h4 {
+                    font-size: 0.95rem;
+                    color: #ff3b5c;
+                    margin: 0 0 1rem 0;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    font-weight: 700;
+                }
+                .db-dump-warning {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    background: rgba(255, 59, 92, 0.15);
+                    border-left: 4px solid #ff3b5c;
+                    padding: 0.75rem 1rem;
+                    border-radius: 6px;
+                    margin-bottom: 1rem;
+                    font-size: 0.875rem;
+                    color: #ff8fa3;
+                }
+                .db-dump-warning i {
+                    color: #ff3b5c;
+                    font-size: 1rem;
+                }
+                .db-dump-content {
+                    background: rgba(0, 0, 0, 0.7);
+                    border: 1px solid rgba(255, 59, 92, 0.3);
+                    border-radius: 8px;
+                    padding: 1rem;
+                    overflow-x: auto;
+                    font-family: 'JetBrains Mono', monospace;
+                    font-size: 0.8rem;
+                    line-height: 1.6;
+                    color: #ff6b7a;
+                    margin: 0 0 1rem 0;
+                    white-space: pre-wrap;
+                    word-break: break-all;
+                    max-height: 300px;
+                }
+                .db-dump-content code {
+                    color: inherit;
+                    font-family: inherit;
+                }
+                .copy-dump-btn {
+                    background: linear-gradient(135deg, rgba(255, 59, 92, 0.3), rgba(255, 59, 92, 0.2));
+                    border: 1px solid rgba(255, 59, 92, 0.5);
+                    color: #ff3b5c;
+                    padding: 0.6rem 1.2rem;
+                    border-radius: 8px;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+                .copy-dump-btn:hover {
+                    background: rgba(255, 59, 92, 0.4);
+                    border-color: rgba(255, 59, 92, 0.7);
+                    box-shadow: 0 0 15px rgba(255, 59, 92, 0.3);
                 }
             </style>
         `;
@@ -1271,6 +1485,20 @@ class PennyWiseApp {
         div.textContent = str;
         return div.innerHTML;
     }
+}
+
+// Global utility functions
+function copyToClipboard(text, type = 'payload') {
+    navigator.clipboard.writeText(text).then(() => {
+        const message = type === 'dump' ? 'Database data copied!' : 'Payload copied!';
+        if (window.pennywise) {
+            window.pennywise.showToast(message, 'success');
+        }
+    }).catch(() => {
+        if (window.pennywise) {
+            window.pennywise.showToast('Failed to copy', 'error');
+        }
+    });
 }
 
 // Initialize app

@@ -67,8 +67,8 @@ class AIVulnerabilityClassifier:
             self.model_available = True
             print("✅ AI Classifier Model loaded successfully")
             
-        except ImportError:
-            print("⚠️ Required libraries not found (torch, transformers, peft)")
+        except ImportError as e:
+            print(f"⚠️ Required libraries not found (torch, transformers, peft): {e}")
             self.model_available = False
         except Exception as e:
             print(f"⚠️ Error loading classifier model: {e}")

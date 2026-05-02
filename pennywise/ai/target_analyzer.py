@@ -9,12 +9,15 @@ import threading
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
+import aiohttp
+
 SYSTEM_PROMPT = """You are a web application security vulnerability classifier.
 Your ONLY allowed output is valid JSON matching this EXACT schema. Nothing else is permitted.
 
 {
   "overall_risk": "low" | "medium" | "high",
   "scan_suggestions": [string],
+  "confidence_score": float,
   "vulnerabilities": [
     {
       "type": string,
@@ -85,9 +88,9 @@ class AITargetAnalyzer:
                 AutoModelForCausalLM,
                 BitsAndBytesConfig,
             )
+
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
-
 
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
@@ -114,8 +117,8 @@ class AITargetAnalyzer:
             self.model_available = True
             print("✅ AI model loaded successfully")
 
-        except ImportError:
-            print("⚠️ Required libraries not found (torch, transformers, peft)")
+        except ImportError as e:
+            print(f"⚠️ Required libraries not found (torch, transformers): {e}")
             self.model_available = False
         except Exception as e:
             print(f"⚠️ Error loading model: {e}")
@@ -238,23 +241,7 @@ class AITargetAnalyzer:
         tech_summary: str,
     ) -> Dict[str, Any]:
 
-        try:
-            import torch
-
-            # Assuming self.tokenizer and self.model are already loaded
-            # e.g. from transformers import AutoTokenizer, AutoModelForCausalLM
-            # with quantization if needed for RTX 3050 (4-bit / 8-bit)
-
-            # Build the full prompt using chat template (recommended for instruct models)
-            # This handles system + user formatting automatically
-            messages = [
-                {
-                    "role": "system",
-                    "content": SYSTEM_PROMPT,
-                },
-                {
-                    "role": "user",
-                    "content": f"""Analyze the following website structure.
+        payload = f"""Analyze the following website structure.
 
 HTML_SNIPPET:
 {html_snippet}
@@ -267,127 +254,66 @@ HEADERS_SUMMARY:
 
 TECH_STACK:
 {tech_summary}
-""",
-                },
-            ]
+"""
 
-            prompt = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,  # Adds the assistant prefix
-                enable_thinking=False,
-            )
-
-            inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-
-            if self.tokenizer.pad_token_id is None:
-                self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
-
-            with torch.no_grad():
-                out = self.model.generate(
-                    **inputs,
-                    max_new_tokens=350,
-                    repetition_penalty=1.05,
-                    do_sample=False,
-                    eos_token_id=self.tokenizer.eos_token_id,
-                    pad_token_id=self.tokenizer.pad_token_id,
-                    use_cache=False,
-                )
-
-            full_response = self.tokenizer.decode(out[0], skip_special_tokens=True)
-
-            if "<|assistant|>" in full_response:
-                response = full_response.split("<|assistant|>", 1)[-1].strip()
-            elif "assistant" in full_response.lower():  # fallback heuristic
-                # Try to cut after last "assistant" marker (case insensitive)
-                idx = full_response.lower().rfind("assistant")
-                if idx != -1:
-                    response = full_response[idx + len("assistant") :].strip()
-                else:
-                    response = full_response.strip()
-            else:
-                response = full_response.strip()
-
-            response = response.replace("<|endoftext|>", "").strip()
-            result = self._parse_ai_response(response)
-            return result
-
-        except Exception as e:
-            print(f"⚠️ AI analysis failed: {e}")
-            return self._rule_based_analysis(
-                html_snippet, forms_summary, headers_summary, tech_summary
-            )
-
-    def _parse_ai_response(self, response: str) -> Dict[str, Any]:
         try:
-            response = response.replace("</think>", "").replace("<think>", "").strip()
-            result = json.loads(response)
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=90)
+            ) as session:
+                async with session.post(
+                    "http://127.0.0.1:8090/classify",
+                    data=payload,
+                    headers={"Content-Type": "text/plain"},
+                ) as resp:
 
-            # Extract overall risk
-            overall_risk = result.get("overall_risk", "low")
-            
-            # Extract scan suggestions (list of attack types)
-            scan_suggestions = result.get("scan_suggestions", [])
-            
-            # Extract vulnerabilities array with type, severity, description, evidence
-            vulnerabilities_list = result.get("vulnerabilities", [])
-            
-            # If using old format, fall back to legacy parsing
-            if not vulnerabilities_list and ("scan_result" in result or "variant" in result):
-                return self._parse_legacy_response(result)
-            
-            # Format vulnerabilities for compatibility
-            formatted_vulnerabilities = []
-            for vuln in vulnerabilities_list:
-                if isinstance(vuln, dict):
-                    formatted_vulnerabilities.append({
-                        "type": vuln.get("type", "unknown"),
-                        "severity": vuln.get("severity", "low"),
-                        "description": vuln.get("description", ""),
-                        "evidence": vuln.get("evidence", "")
-                    })
-                else:
-                    # String format fallback
-                    formatted_vulnerabilities.append({
-                        "type": str(vuln),
-                        "severity": "low",
-                        "description": f"{str(vuln)} vulnerability detected",
-                        "evidence": ""
-                    })
-            
-            # Map vulnerability types to attack types
-            attack_types = scan_suggestions if scan_suggestions else self._extract_attack_types(formatted_vulnerabilities)
-            
-            # Build final response
-            response_data = {
-                "success": True,
-                "overall_risk": overall_risk,
-                "attack_types": attack_types,
-                "scan_suggestions": scan_suggestions,
-                "vulnerabilities": formatted_vulnerabilities,
-                "reasoning": f"Risk level: {overall_risk}. Detected {len(formatted_vulnerabilities)} vulnerabilities.",
-                "method": "ai",
-                "raw_response": response,
-            }
+                    raw = await resp.text()
 
-            return response_data
+                    if resp.status != 200:
+                        raise RuntimeError(
+                            f"error {resp.status}: {raw[:200]}"
+                        )
+
+                    result = json.loads(raw)
+                    vulnerabilities = result.get("vulnerabilities", [])
+                    scan_suggestions = result.get("scan_suggestions", [])
+                    overall_risk = result.get("overall_risk", "low")
+
+                    formatted_vulnerabilities = []
+                    for v in vulnerabilities:
+                        formatted_vulnerabilities.append(
+                            {
+                                "type": v.get("type", "unknown"),
+                                "severity": v.get("severity", "low"),
+                                "description": v.get("description", ""),
+                                "evidence": v.get("evidence", ""),
+                            }
+                        )
+
+                    attack_types = (
+                        scan_suggestions
+                        if scan_suggestions
+                        else self._extract_attack_types(formatted_vulnerabilities)
+                    )
+
+                    return {
+                        "success": True,
+                        "overall_risk": overall_risk,
+                        "attack_types": attack_types,
+                        "scan_suggestions": scan_suggestions,
+                        "vulnerabilities": formatted_vulnerabilities,
+                        "reasoning": f"Risk level: {overall_risk}. Detected {len(formatted_vulnerabilities)} vulnerabilities.",
+                        "method": "ai-backend",
+                        "raw_response": raw,
+                    }
 
         except Exception as e:
-            print(f"⚠️ Failed to parse AI response: {e}")
-            print(f"   Raw response: {response[:200]}...")
+            return self._rule_based_analysis(
+                html_snippet,
+                forms_summary,
+                headers_summary,
+                tech_summary,
+            )
 
-            # Return the raw response for UI display
-            return {
-                "success": False,
-                "error": f"JSON Parse Error: {str(e)}",
-                "raw_response": response,
-                "attack_types": ["xss", "sqli", "csrf"],  # Default fallback
-                "method": "parse-error",
-                "reasoning": f"Unable to parse AI model output. Error: {str(e)}",
-                "vulnerabilities": [],
-                "recommendation": {},
-            }
-    
     def _parse_legacy_response(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """Parse responses in the old format for backward compatibility."""
         vulnerabilities = []
@@ -450,7 +376,7 @@ TECH_STACK:
                 response_data["status"] = result["status"]
 
             return response_data
-    
+
     def _extract_attack_types(self, vulnerabilities: List[Dict[str, Any]]) -> List[str]:
         """Extract unique attack types from vulnerabilities list."""
         attack_types = []

