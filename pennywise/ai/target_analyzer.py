@@ -111,7 +111,7 @@ class AITargetAnalyzer:
                     "low_cpu_mem_usage": True,
                 }
 
-            model_id = "Qwen/Qwen3.5-2B"
+            model_id = "Qwen/Qwen3.5-0.8B"
 
             print(f"📥 [AI Analyzer] Loading model: {model_id}")
             tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
