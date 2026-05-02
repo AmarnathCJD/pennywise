@@ -989,8 +989,14 @@
             const analysis = data.analysis;
             const attackTypes = analysis.attack_types || [];
             const scanSuggestions = analysis.scan_suggestions || attackTypes;
-            const vulnerabilities = analysis.vulnerabilities || [];
-            const overallRisk = analysis.overall_risk || 'unknown';
+            // Normalize vulnerabilities: API may return strings or objects
+            const rawVulns = analysis.vulnerabilities || [];
+            const vulnerabilities = rawVulns.map(v =>
+                typeof v === 'string'
+                    ? { type: v.toLowerCase(), severity: 'low', description: `${v} vulnerability detected` }
+                    : v
+            );
+            const overallRisk = analysis.overall_risk || (vulnerabilities.length > 0 ? 'low' : 'unknown');
             const method = analysis.method || 'ai';
             
             let html = '';
