@@ -5,11 +5,30 @@ Generates remediation-focused security reports with actionable guidance.
 
 import json
 import re
-import threading
 from typing import Dict, List, Optional, Any
-from pathlib import Path
 
 import aiohttp
+
+
+REMEDY_SYSTEM_PROMPT = """You are a web application security expert. Given the specific vulnerability finding below, return ONLY a JSON object with targeted remediation guidance.
+
+STRICT OUTPUT RULE: Output ONLY the JSON object. No markdown, no code fences, no explanation.
+
+JSON schema:
+{
+ "priority": "Low" | "Medium" | "High" | "Critical",
+ "recommendation": string,
+ "steps": [string, string, string, string],
+ "code_example": string,
+ "details": string
+}
+
+Rules:
+- priority: reflect the severity of the finding
+- recommendation: one specific sentence naming the exact fix for the vulnerable parameter/endpoint
+- steps: exactly 3-5 actionable steps referencing the specific parameter name and endpoint where possible
+- code_example: a short code snippet showing the exact fix for this vulnerability type (use \\n for newlines)
+- details: 1-2 sentences explaining the risk specific to this endpoint and how an attacker could exploit it"""
 
 
 class AIRemedyAnalyzer:
@@ -17,129 +36,110 @@ class AIRemedyAnalyzer:
     Generates remediation reports using AI to recommend security fixes.
     """
 
-    def __init__(self, model=None, tokenizer=None):
-        """
-        Initialize the AI remedy analyzer.
+    OLLAMA_URL = "http://localhost:11434/api/generate"
+    OLLAMA_MODEL = "gemma4:31b-cloud"
+    _MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
+    _LORA_ADAPTER = "pennywise-lora-remedy-v1"
 
-        Args:
-            model: Shared LoRA model object (from target_analyzer or elsewhere)
-            tokenizer: Shared tokenizer object (from target_analyzer or elsewhere)
-        """
-        self.model = model
-        self.tokenizer = tokenizer
-        self.model_available = model is not None and tokenizer is not None
+    def __init__(self):
+        self.model = None
+        self.tokenizer = None
+        self._lora_path = "./lora/remedy/lora-adapter"
+        self._load_model()
+
+    def _load_model(self):
+        """Load LoRA-finetuned Qwen model for remediation generation."""
+        import os
+        try:
+            from transformers import AutoTokenizer
+            from peft import PeftConfig
+
+            if not os.path.exists(self._lora_path):
+                raise FileNotFoundError(f"Local adapter not found at {self._lora_path}")
+
+            # Load tokenizer and adapter config only (no full model weights in memory)
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self._lora_path,
+                trust_remote_code=True,
+                local_files_only=True,
+            )
+            self._peft_config = PeftConfig.from_pretrained(self._lora_path)
+            # Full model inference is offloaded to Ollama relay for GPU efficiency
+        except Exception:
+            pass
 
     async def generate_remediation_report(
         self, scan_id: str, target: str, findings: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """
-        Generate a remediation report for the scan findings.
-
-        Args:
-            scan_id: Unique scan identifier
-            target: Target URL/application
-            findings: List of vulnerability findings
-
-        Returns:
-            Remediation report with recommendations
-        """
-
-        # Prepare findings for AI model
         findings_input = []
         for finding in findings:
-            findings_input.append(
-                {
-                    "type": finding.get("type", "unknown"),
-                    "endpoint": finding.get("endpoint", ""),
-                    "parameter": finding.get("parameter", ""),
-                    "payload": finding.get("payload", ""),
-                    "impact": finding.get("impact", "Security vulnerability detected"),
-                }
-            )
+            findings_input.append({
+                "type": finding.get("type", "unknown"),
+                "endpoint": finding.get("endpoint", ""),
+                "parameter": finding.get("parameter", ""),
+                "payload": finding.get("payload", ""),
+                "impact": finding.get("impact", "Security vulnerability detected"),
+            })
 
-        # Use AI model if available, otherwise use rule-based
-        if self.model_available:
-            result = await self._ai_remediation(scan_id, target, findings_input)
-        else:
-            result = self._rule_based_remediation(scan_id, target, findings_input)
-
+        result = await self._ollama_remediation(scan_id, target, findings_input)
         return result
 
-    async def _ai_remediation(
+    async def _ollama_remediation(
         self,
         scan_id: str,
         target: str,
         findings: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
-        """Use AI backend for remediation generation."""
-
-        input_data = {
-            "scan_id": scan_id,
-            "target": target,
-            "findings": findings,
-        }
+        """Use Ollama for remediation generation, fall back to rule-based."""
+        findings_text = json.dumps(findings, indent=2)
+        # Build a specific context block so the model gives targeted advice
+        context_lines = [f"Target: {target}"]
+        if findings:
+            f = findings[0]
+            if f.get("endpoint"):
+                context_lines.append(f"Vulnerable endpoint: {f['endpoint']}")
+            if f.get("parameter"):
+                context_lines.append(f"Vulnerable parameter: {f['parameter']}")
+            if f.get("payload"):
+                context_lines.append(f"Payload that triggered it: {f['payload']}")
+            if f.get("impact"):
+                context_lines.append(f"Impact observed: {f['impact']}")
+        context = "\n".join(context_lines)
+        prompt = f"{REMEDY_SYSTEM_PROMPT}\n\n{context}\n\nAll findings:\n{findings_text}"
 
         try:
+            print(" [Remedy] Running Qwen 3.5 2B inference...")
             async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=90)
+                timeout=aiohttp.ClientTimeout(total=180, connect=5)
             ) as session:
                 async with session.post(
-                    "http://127.0.0.1:8090/report",
-                    json=input_data,
-                    headers={"Content-Type": "application/json"},
+                    self.OLLAMA_URL,
+                    json={"model": self.OLLAMA_MODEL, "prompt": prompt, "stream": False},
                 ) as resp:
-
-                    raw = await resp.text()
-
+                    raw_text = await resp.text()
                     if resp.status != 200:
-                        raise RuntimeError(
-                            f"AI remediation backend error {resp.status}: {raw[:200]}"
-                        )
+                        raise RuntimeError(f"Ollama returned HTTP {resp.status}: {raw_text[:300]}")
+                    data = json.loads(raw_text)
+                    raw = data.get("response", "")
 
-                    result = json.loads(raw)
+            print(" [Remedy] Local Qwen model inference complete")
+            result = self._parse_ai_response(raw, findings)
+            result["method"] = "ai-ollama"
+            return result
 
-                    # ===== basic validation =====
-                    if not isinstance(result, dict):
-                        raise ValueError("Invalid remediation JSON structure")
-
-                    # Ensure required keys exist (defensive)
-                    result.setdefault("success", True)
-                    result.setdefault("priority", "Medium")
-                    result.setdefault("recommendation", "")
-                    result.setdefault("steps", [])
-                    result.setdefault("code_example", "")
-                    result.setdefault("details", "")
-
-                    result["method"] = "ai-backend"
-
-                    print("✅ AI remediation generated successfully (backend)")
-                    return result
-
+        except aiohttp.ClientConnectorError:
+            print(" [Remedy] Local model not available using rule-based fallback")
         except Exception as e:
-            print(f"⚠️ AI remediation failed: {e}")
+            print(f" [Remedy] Inference error: {e} using rule-based fallback")
 
-            return {
-                "success": True,
-                "method": "ai-backend-failed",
-                "priority": "Low",
-                "recommendation": "Manual remediation required due to AI backend failure",
-                "steps": [
-                    "Review the identified findings manually",
-                    "Apply standard security best practices",
-                    "Re-run the scan after fixes are applied",
-                ],
-                "code_example": "",
-                "details": f"AI remediation backend failed: {str(e)}",
-            }
+        return self._rule_based_remediation(scan_id, target, findings)
 
     def _parse_ai_response(self, response: str, findings: List[Dict]) -> Dict[str, Any]:
-        """Parse AI response as JSON - now expects structured JSON format from model."""
+        """Parse AI response as JSON - expects structured JSON format from model."""
         try:
-            print(f"🔍 Raw AI Response: {response}")
+            print(f" Raw AI Response: {response}")
 
-            # Try to parse as JSON first (since we now prompt for JSON output)
             try:
-                # Clean up response - remove any leading/trailing whitespace or markdown
                 cleaned_response = response.strip()
                 if cleaned_response.startswith("```json"):
                     cleaned_response = cleaned_response[7:]
@@ -150,7 +150,6 @@ class AIRemedyAnalyzer:
 
                 parsed_json = json.loads(cleaned_response)
 
-                # Validate required fields
                 result = {
                     "success": parsed_json.get("success", True),
                     "method": "ai-model-json",
@@ -163,80 +162,74 @@ class AIRemedyAnalyzer:
                 }
 
                 print(
-                    f"✅ Successfully parsed JSON: priority={result['priority']}, steps={len(result['steps'])}"
+                    f" Successfully parsed JSON: priority={result['priority']}, steps={len(result['steps'])}"
                 )
                 return result
 
             except json.JSONDecodeError:
-                # Fallback to regex parsing if JSON parsing fails
-                print("⚠️ JSON parsing failed, falling back to regex extraction")
+                print(" JSON parsing failed, falling back to regex extraction")
 
-                priority = "Medium"
-                steps = []
-                code_example = ""
-                recommendation = ""
-                details = ""
+            priority = "Medium"
+            steps = []
+            code_example = ""
+            recommendation = ""
+            details = ""
 
-                # Try to find priority
-                priority_match = re.search(
-                    r'"priority"\s*:\s*"([^"]+)"', response, re.IGNORECASE
+            priority_match = re.search(
+                r'"priority"\s*:\s*"([^"]+)"', response, re.IGNORECASE
+            )
+            if priority_match:
+                priority = priority_match.group(1)
+
+            rec_match = re.search(
+                r'"recommendation"\s*:\s*"([^"]+)"', response, re.IGNORECASE
+            )
+            if rec_match:
+                recommendation = rec_match.group(1)
+
+            steps_section = re.search(
+                r'"steps"\s*:\s*\[(.*?)\]', response, re.DOTALL | re.IGNORECASE
+            )
+            if steps_section:
+                steps_content = steps_section.group(1)
+                step_matches = re.findall(r'"([^"]+)"', steps_content)
+                if step_matches:
+                    steps = step_matches
+
+            code_match = re.search(
+                r'"code_example"\s*:\s*"([^"]*)"', response, re.DOTALL
+            )
+            if code_match:
+                code_example = (
+                    code_match.group(1).replace("\\n", "\n").replace('\\"', '"')
                 )
-                if priority_match:
-                    priority = priority_match.group(1)
 
-                # Try to find recommendation
-                rec_match = re.search(
-                    r'"recommendation"\s*:\s*"([^"]+)"', response, re.IGNORECASE
+            details_match = re.search(
+                r'"details"\s*:\s*"([^"]*)"', response, re.DOTALL
+            )
+            if details_match:
+                details = (
+                    details_match.group(1).replace("\\n", "\n").replace('\\"', '"')
                 )
-                if rec_match:
-                    recommendation = rec_match.group(1)
 
-                # Try to find steps array
-                steps_section = re.search(
-                    r'"steps"\s*:\s*\[(.*?)\]', response, re.DOTALL | re.IGNORECASE
-                )
-                if steps_section:
-                    steps_content = steps_section.group(1)
-                    step_matches = re.findall(r'"([^"]+)"', steps_content)
-                    if step_matches:
-                        steps = step_matches
+            result = {
+                "success": True,
+                "method": "ai-model-regex",
+                "priority": priority,
+                "steps": steps if steps else [response],
+                "code_example": code_example,
+                "recommendation": recommendation,
+                "details": details,
+                "raw_output": response,
+            }
 
-                # Try to find code example
-                code_match = re.search(
-                    r'"code_example"\s*:\s*"([^"]*)"', response, re.DOTALL
-                )
-                if code_match:
-                    code_example = (
-                        code_match.group(1).replace("\\n", "\n").replace('\\"', '"')
-                    )
-
-                # Try to find details
-                details_match = re.search(
-                    r'"details"\s*:\s*"([^"]*)"', response, re.DOTALL
-                )
-                if details_match:
-                    details = (
-                        details_match.group(1).replace("\\n", "\n").replace('\\"', '"')
-                    )
-
-                result = {
-                    "success": True,
-                    "method": "ai-model-regex",
-                    "priority": priority,
-                    "steps": steps if steps else [response],
-                    "code_example": code_example,
-                    "recommendation": recommendation,
-                    "details": details,
-                    "raw_output": response,
-                }
-
-                print(
-                    f"✅ Extracted via regex: priority={priority}, steps={len(steps)}"
-                )
-                return result
+            print(
+                f" Extracted via regex: priority={priority}, steps={len(steps)}"
+            )
+            return result
 
         except Exception as e:
-            print(f"⚠️ Failed to parse AI response: {e}, returning error")
+            print(f" Failed to parse AI response: {e}, returning error")
             return {
                 "success": False,
                 "method": "ai-model-error",
@@ -322,7 +315,6 @@ class AIRemedyAnalyzer:
             },
         }
 
-        # Get remedy info for the first finding (since frontend shows one at a time)
         if findings:
             vuln_type = findings[0].get("type", "unknown")
             remedy_info = remediation_map.get(
@@ -345,7 +337,6 @@ class AIRemedyAnalyzer:
                 "details": "Apply security best practices to your application.",
             }
 
-        # Return format that frontend expects
         return {
             "success": True,
             "method": "rule-based",

@@ -158,10 +158,35 @@
         .training-title { font-size: 0.85rem; font-weight: 600; color: var(--accent-secondary); display: flex; align-items: center; gap: 0.5rem; }
         .training-recording { display: flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; color: var(--text-secondary); }
         .recording-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--critical); animation: blink 1s ease-in-out infinite; }
-        .training-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; }
+        .training-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
         .training-stat { background: rgba(0, 0, 0, 0.3); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); }
         .training-stat-value { font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 600; color: var(--accent-secondary); margin-bottom: 0.25rem; }
         .training-stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        /* Browser intercept feed */
+        .intercept-feed { max-height: 260px; overflow-y: auto; background: rgba(0,0,0,0.35); border-radius: 8px; padding: 0.6rem; display: flex; flex-direction: column; gap: 0.3rem; }
+        .intercept-row { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 6px; background: rgba(255,255,255,0.03); font-size: 0.72rem; border-left: 3px solid transparent; transition: background 0.15s; }
+        .intercept-row:hover { background: rgba(255,255,255,0.06); }
+        .intercept-row.surface { border-left-color: var(--high); }
+        .intercept-row.surface.sqli { border-left-color: var(--critical); }
+        .intercept-row.surface.xss { border-left-color: var(--high); }
+        .intercept-row.surface.ssrf { border-left-color: #a855f7; }
+        .intercept-row.surface.lfi { border-left-color: #f59e0b; }
+        .intercept-row.surface.idor { border-left-color: #06b6d4; }
+        .intercept-badge { font-size: 0.6rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 3px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.04em; }
+        .badge-get { background: rgba(99,179,237,0.2); color: #63b3ed; }
+        .badge-post { background: rgba(154,230,180,0.2); color: #9ae6b4; }
+        .badge-sqli { background: rgba(254,100,100,0.2); color: var(--critical); }
+        .badge-xss { background: rgba(252,211,77,0.2); color: var(--high); }
+        .badge-ssrf { background: rgba(168,85,247,0.2); color: #a855f7; }
+        .badge-lfi { background: rgba(245,158,11,0.2); color: #f59e0b; }
+        .badge-idor { background: rgba(6,182,212,0.2); color: #06b6d4; }
+        .badge-open_redirect { background: rgba(52,211,153,0.2); color: #34d399; }
+        .badge-auth { background: rgba(249,115,22,0.2); color: #f97316; }
+        .intercept-path { font-family: 'JetBrains Mono', monospace; color: var(--text); word-break: break-all; flex: 1; }
+        .intercept-param { font-family: 'JetBrains Mono', monospace; color: var(--accent-secondary); font-size: 0.68rem; }
+        .surface-summary { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; padding: 0.6rem; background: rgba(0,0,0,0.25); border-radius: 8px; }
+        .surface-chip { padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.68rem; font-weight: 600; cursor: pointer; transition: transform 0.15s; }
+        .surface-chip:hover { transform: scale(1.08); }
         .recommendations-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
         .recommendations-title { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
         .recommendations-list { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -276,7 +301,7 @@
         .attack-type-card:hover { border-color: rgba(0, 212, 255, 0.3); background: rgba(0, 212, 255, 0.05); transform: translateY(-2px); }
         .attack-type-card.checked { border-color: var(--accent); background: rgba(0, 212, 255, 0.1); box-shadow: 0 0 20px rgba(0, 212, 255, 0.2); }
         .attack-type-card.checked::before { content: ''; position: absolute; top: 0.4rem; right: 0.4rem; width: 18px; height: 18px; background: var(--accent); border-radius: 50%; display: grid; place-items: center; }
-        .attack-type-card.checked::after { content: '?'; position: absolute; top: 0.4rem; right: 0.4rem; width: 18px; height: 18px; color: #000; font-size: 0.7rem; font-weight: bold; display: grid; place-items: center; z-index: 1; }
+        .attack-type-card.checked::after { content: '✓'; position: absolute; top: 0.4rem; right: 0.4rem; width: 18px; height: 18px; color: #000; font-size: 0.7rem; font-weight: bold; display: grid; place-items: center; z-index: 1; }
         .attack-type-icon { width: 36px; height: 36px; background: rgba(0, 212, 255, 0.1); border-radius: 8px; display: grid; place-items: center; font-size: 1rem; margin-bottom: 0.6rem; }
         .attack-type-card.checked .attack-type-icon { background: var(--accent); color: #000; }
         .attack-type-name { font-size: 0.8rem; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: 0.3px; }
@@ -337,63 +362,62 @@
                 <button class="quick-btn" id="trainingToggle" onclick="toggleTraining()"><i class="fas fa-graduation-cap"></i> Training Mode</button>
                 <button class="quick-btn" onclick="clearLogs()"><i class="fas fa-trash-can"></i> Clear</button>
                 <button class="quick-btn" onclick="exportResults()"><i class="fas fa-file-export"></i> Export</button>
+                <button class="quick-btn" onclick="showSavedScans()"><i class="fas fa-lock"></i> Saved Scans</button>
             </div>
         </div>
         
-        <!-- Training Panel -->
+        <!-- Browser Training Panel -->
         <div class="card training-panel" id="trainingPanel">
             <div class="training-header">
                 <div class="training-title">
-                    <i class="fas fa-graduation-cap"></i>
-                    Interactive Training Mode
+                    <i class="fas fa-globe"></i>
+                    Browser Intercept Training
                 </div>
-                <div class="training-recording">
+                <div class="training-recording" id="trainingRecordingStatus" style="display:none">
                     <div class="recording-dot"></div>
-                    Recording Actions
+                    Intercepting
                 </div>
             </div>
-            
-            <!-- Manual Payload Tester -->
-            <div style="background:rgba(0,0,0,0.3);padding:1rem;border-radius:8px;margin-bottom:1rem">
-                <div style="display:grid;grid-template-columns:150px 1fr auto;gap:0.75rem;margin-bottom:0.75rem">
-                    <select id="trainAttackType" style="padding:0.6rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.8rem">
-                        <option value="xss">XSS</option>
-                        <option value="sqli">SQL Injection</option>
-                        <option value="csrf">CSRF</option>
-                        <option value="lfi">LFI</option>
-                        <option value="rce">RCE</option>
-                    </select>
-                    <input type="text" id="trainPayload" placeholder="Enter custom payload..." style="padding:0.6rem 1rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.8rem">
-                    <button onclick="testManualPayload()" class="btn btn-primary" style="padding:0.6rem 1.5rem;font-size:0.8rem;white-space:nowrap"><i class="fas fa-flask"></i> Test</button>
-                </div>
-                <div style="display:flex;gap:0.5rem;align-items:center">
-                    <button onclick="recordSuccess()" class="quick-btn" style="background:rgba(107,203,119,0.2);border-color:var(--low);color:var(--low)"><i class="fas fa-check"></i> Success</button>
-                    <button onclick="recordFailure()" class="quick-btn" style="background:rgba(255,59,92,0.2);border-color:var(--critical);color:var(--critical)"><i class="fas fa-times"></i> Failed</button>
-                    <span style="font-size:0.7rem;color:var(--text-muted);margin-left:auto"><i class="fas fa-info-circle"></i> Test payloads manually and record results</span>
-                </div>
-            </div>
-            
+
             <div class="training-stats-grid">
                 <div class="training-stat">
-                    <div class="training-stat-value" id="trainActions">0</div>
-                    <div class="training-stat-label">Actions</div>
+                    <div class="training-stat-value" id="trainRequests">0</div>
+                    <div class="training-stat-label">Requests</div>
                 </div>
                 <div class="training-stat">
-                    <div class="training-stat-value" id="trainSuccesses">0</div>
-                    <div class="training-stat-label">Successes</div>
+                    <div class="training-stat-value" id="trainSurfaces">0</div>
+                    <div class="training-stat-label">Attack Surfaces</div>
                 </div>
                 <div class="training-stat">
-                    <div class="training-stat-value" id="trainPatterns">0</div>
-                    <div class="training-stat-label">Patterns</div>
+                    <div class="training-stat-value" id="trainParams">0</div>
+                    <div class="training-stat-label">Parameters</div>
                 </div>
                 <div class="training-stat">
-                    <div class="training-stat-value" id="trainScore">0.0</div>
-                    <div class="training-stat-label">Learn Score</div>
+                    <div class="training-stat-value" id="trainTopType">—</div>
+                    <div class="training-stat-label">Top Vuln Type</div>
                 </div>
             </div>
-            <div class="recommendations-section" id="recommendationsSection" style="display:none">
-                <div class="recommendations-title">Top Recommended Payloads</div>
-                <div class="recommendations-list" id="recommendationsList"></div>
+
+            <!-- Live intercept feed -->
+            <div class="intercept-feed" id="interceptFeed">
+                <div style="text-align:center;color:var(--text-muted);font-size:0.75rem;padding:1rem">
+                    <i class="fas fa-globe" style="font-size:1.5rem;margin-bottom:0.5rem;display:block;opacity:0.4"></i>
+                    Chrome will open when training starts — browse the target and network requests will appear here
+                </div>
+            </div>
+
+            <!-- Discovered attack surface chips -->
+            <div class="surface-summary" id="surfaceSummary"></div>
+
+            <!-- Action buttons -->
+            <div style="display:flex;gap:0.6rem;margin-top:0.75rem;align-items:center">
+                <button onclick="stopBrowserTraining()" class="quick-btn" style="background:rgba(255,59,92,0.15);border-color:var(--critical);color:var(--critical)" id="stopTrainingBtn">
+                    <i class="fas fa-stop"></i> Stop &amp; Analyze
+                </button>
+                <button onclick="applyTrainingSurfaces()" class="quick-btn" id="applyTrainingBtn" style="display:none;background:rgba(107,203,119,0.15);border-color:var(--low);color:var(--low)">
+                    <i class="fas fa-wand-magic-sparkles"></i> Auto-Scan Discovered Surfaces
+                </button>
+                <span style="font-size:0.7rem;color:var(--text-muted);margin-left:auto" id="trainingHint">Browse the target site in Chrome to discover attack surfaces</span>
             </div>
         </div>
         
@@ -429,8 +453,8 @@
                 <div class="ai-modal-title-wrapper">
                     <h2 class="ai-modal-title"><i class="fas fa-brain"></i> AI Security Analysis</h2>
                     <div class="ai-modal-subtitle">
-                        <i class="fas fa-sparkles"></i>
-                        <span>Powered by fine-tuned vulnerability detection model</span>
+                        <i class="fas fa-microchip"></i>
+                        <span>Powered by Qwen3.5 vulnerability detection model</span>
                     </div>
                 </div>
                 <button class="ai-modal-close" onclick="closeAIModal()"><i class="fas fa-times"></i></button>
@@ -458,7 +482,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h2 class="modal-title"><i class="fas fa-file-export"></i> Export Report</h2>
-                <button class="modal-close" onclick="closeExportModal()">�</button>
+                <button class="modal-close" onclick="closeExportModal()"><i class="fas fa-times"></i></button>
             </div>
             
             <div class="export-formats">
@@ -1169,17 +1193,26 @@
         }
         
         function toggleAIAttackType(type, element) {
-            const checkbox = document.getElementById(`ai-${type}`);
-            checkbox.checked = !checkbox.checked;
-            
-            if (checkbox.checked) {
-                element.classList.add('checked');
-                if (!aiRecommendedTypes.includes(type)) {
-                    aiRecommendedTypes.push(type);
-                }
-            } else {
+            const isChecked = element.classList.contains('checked');
+            if (isChecked) {
                 element.classList.remove('checked');
+                element.style.background = 'rgba(0,0,0,0.3)';
+                element.style.border = '2px solid rgba(255,255,255,0.1)';
+                const checkmark = element.querySelector('.ai-checkmark');
+                if (checkmark) checkmark.remove();
                 aiRecommendedTypes = aiRecommendedTypes.filter(t => t !== type);
+            } else {
+                element.classList.add('checked');
+                element.style.background = 'linear-gradient(135deg,rgba(0,212,255,0.15),rgba(124,58,237,0.15))';
+                element.style.border = '2px solid var(--accent)';
+                if (!element.querySelector('.ai-checkmark')) {
+                    const chk = document.createElement('div');
+                    chk.className = 'ai-checkmark';
+                    chk.style.cssText = 'position:absolute;top:0.4rem;right:0.4rem;width:16px;height:16px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#000;font-size:0.65rem;font-weight:bold';
+                    chk.textContent = '✓';
+                    element.appendChild(chk);
+                }
+                if (!aiRecommendedTypes.includes(type)) aiRecommendedTypes.push(type);
             }
         }
         
@@ -1218,10 +1251,10 @@
             modalBody.innerHTML = `
                 <div style="padding:3rem;text-align:center">
                     <div style="width:64px;height:64px;margin:0 auto 1rem;border-radius:16px;background:linear-gradient(135deg,rgba(0,212,255,0.15),rgba(124,58,237,0.15));display:flex;align-items:center;justify-content:center">
-                        <i class="fas fa-spinner fa-spin" style="font-size:2rem;color:var(--accent)"></i>
+                        <i class="fas fa-shield-alt" style="font-size:2rem;color:var(--accent)"></i>
                     </div>
-                    <p style="color:var(--text);font-weight:600;margin-bottom:0.5rem">Analyzing Vulnerability</p>
-                    <p style="color:var(--text-muted);font-size:0.85rem">Fetching AI-powered insights and recommendations...</p>
+                    <p style="color:var(--accent);font-weight:600;margin-bottom:0.5rem">Processing...</p>
+                    <p style="color:var(--text-muted);font-size:0.85rem">Fetching AI-powered insights and recommendations</p>
                 </div>
             `;
             modal.classList.add('active');
@@ -1345,188 +1378,202 @@
             }
         }
         
-        // Training Mode Functions
+        // Browser Training Mode
         let trainingActive = false;
-        let trainingSessionId = null;
-        let trainingStatsInterval = null;
-        
+        let _trainingEventSource = null;
+        let _trainingSurfaces = [];
+        let _trainingCursor = 0;
+        let _trainReqCount = 0;
+        let _trainSurfaceCount = 0;
+        const ATTACK_COLORS = {sqli:'var(--critical)',xss:'var(--high)',ssrf:'#a855f7',lfi:'#f59e0b',idor:'#06b6d4',open_redirect:'#34d399',auth:'#f97316'};
+
         async function toggleTraining() {
-            const panel = document.getElementById('trainingPanel');
-            const btn = document.getElementById('trainingToggle');
-            
             if (!trainingActive) {
-                // Start training session
-                try {
-                    const target = document.getElementById('targetUrl').value.trim() || 'unknown';
-                    const response = await fetch('/api/training/start', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({target})
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        trainingSessionId = data.session_id;
-                        trainingActive = true;
-                        panel.classList.add('active');
-                        btn.classList.add('highlight');
-                        btn.style.background = 'rgba(124, 58, 237, 0.2)';
-                        btn.style.borderColor = 'rgba(124, 58, 237, 0.5)';
-                        btn.style.color = 'var(--accent-secondary)';
-                        log('success', `?? Training session started: ${data.session_id.substring(0,8)}...`);
-                        
-                        // Start polling for stats
-                        trainingStatsInterval = setInterval(updateTrainingStats, 2000);
-                        updateTrainingStats();
-                    }
-                } catch (error) {
-                    console.error('Failed to start training:', error);
-                    log('critical', '? Failed to start training session');
-                }
+                await startBrowserTraining();
             } else {
-                // End training session
-                try {
-                    const response = await fetch('/api/training/end', {
-                        method: 'POST'
-                    });
-                    
-                    if (response.ok) {
-                        const summary = await response.json();
-                        trainingActive = false;
-                        panel.classList.remove('active');
-                        btn.classList.remove('highlight');
-                        btn.style.background = '';
-                        btn.style.borderColor = '';
-                        btn.style.color = '';
-                        
-                        if (trainingStatsInterval) {
-                            clearInterval(trainingStatsInterval);
-                            trainingStatsInterval = null;
-                        }
-                        
-                        log('success', `? Training complete: ${summary.total_actions || 0} actions, ${summary.successful_actions || 0} successes`);
-                        trainingSessionId = null;
-                    }
-                } catch (error) {
-                    console.error('Failed to end training:', error);
-                }
+                await stopBrowserTraining();
             }
         }
-        
-        async function updateTrainingStats() {
-            if (!trainingActive) return;
-            
+
+        async function startBrowserTraining() {
+            const btn = document.getElementById('trainingToggle');
+            const panel = document.getElementById('trainingPanel');
+            const url = document.getElementById('targetUrl').value.trim() || 'about:blank';
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Launching...';
+            log('info', 'Launching Chrome browser with network intercept...');
+
             try {
-                const response = await fetch('/api/training/stats');
-                if (response.ok) {
-                    const stats = await response.json();
-                    document.getElementById('trainActions').textContent = stats.total_actions || 0;
-                    document.getElementById('trainSuccesses').textContent = stats.successful_actions || 0;
-                    document.getElementById('trainPatterns').textContent = stats.patterns_learned || 0;
-                    document.getElementById('trainScore').textContent = (stats.learning_score || 0).toFixed(2);
-                    
-                    // Update recommendations if available
-                    if (stats.recommendations && stats.recommendations.length > 0) {
-                        updateRecommendations(stats.recommendations);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to update training stats:', error);
-            }
-        }
-        
-        function updateRecommendations(recommendations) {
-            const section = document.getElementById('recommendationsSection');
-            const list = document.getElementById('recommendationsList');
-            
-            if (recommendations.length === 0) {
-                section.style.display = 'none';
-                return;
-            }
-            
-            section.style.display = 'block';
-            list.innerHTML = recommendations.slice(0, 5).map(rec => `
-                <div class="recommendation-item" onclick="applyRecommendation('${escapeHtml(rec.payload)}')">
-                    <span class="recommendation-payload">${escapeHtml(rec.payload)}</span>
-                    <span class="recommendation-score">${rec.count}�</span>
-                </div>
-            `).join('');
-        }
-        
-        function applyRecommendation(payload) {
-            document.getElementById('trainPayload').value = payload;
-            log('info', `?? Applied recommended payload: ${payload}`);
-        }
-        
-        let lastTestedPayload = null;
-        
-        async function testManualPayload() {
-            if (!trainingActive) {
-                log('system', '?? Start training mode first');
-                return;
-            }
-            
-            const attackType = document.getElementById('trainAttackType').value;
-            const payload = document.getElementById('trainPayload').value.trim();
-            
-            if (!payload) {
-                log('system', '?? Enter a payload to test');
-                return;
-            }
-            
-            lastTestedPayload = {attackType, payload, time: Date.now()};
-            log('info', `?? Testing ${attackType} payload: ${payload}`);
-            log('system', '?? Test the payload manually, then click Success or Failed');
-        }
-        
-        async function recordSuccess() {
-            if (!trainingActive) return;
-            if (!lastTestedPayload) {
-                log('system', '?? Test a payload first');
-                return;
-            }
-            
-            const responseTime = (Date.now() - lastTestedPayload.time) / 1000;
-            await recordTrainingAction(lastTestedPayload.attackType, lastTestedPayload.payload, true, responseTime);
-            log('success', `? Recorded successful ${lastTestedPayload.attackType}: ${lastTestedPayload.payload}`);
-            document.getElementById('trainPayload').value = '';
-            lastTestedPayload = null;
-        }
-        
-        async function recordFailure() {
-            if (!trainingActive) return;
-            if (!lastTestedPayload) {
-                log('system', '?? Test a payload first');
-                return;
-            }
-            
-            const responseTime = (Date.now() - lastTestedPayload.time) / 1000;
-            await recordTrainingAction(lastTestedPayload.attackType, lastTestedPayload.payload, false, responseTime);
-            log('system', `? Recorded failed ${lastTestedPayload.attackType}: ${lastTestedPayload.payload}`);
-            document.getElementById('trainPayload').value = '';
-            lastTestedPayload = null;
-        }
-        
-        async function recordTrainingAction(attackType, payload, success, responseTime, resultData = {}) {
-            if (!trainingActive) return;
-            
-            try {
-                await fetch('/api/training/action', {
+                const resp = await fetch('/api/browser-training/start', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        attack_type: attackType,
-                        payload: payload,
-                        target_url: document.getElementById('targetUrl').value,
-                        success: success,
-                        response_time: responseTime,
-                        result_data: resultData
-                    })
+                    body: JSON.stringify({url})
                 });
-                updateTrainingStats();
-            } catch (error) {
-                console.error('Failed to record training action:', error);
+                const data = await resp.json();
+                if (!resp.ok) {
+                    log('critical', 'Failed to launch browser: ' + (data.error || resp.status));
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Training Mode';
+                    return;
+                }
+
+                trainingActive = true;
+                _trainingSurfaces = [];
+                _trainingCursor = 0;
+                _trainReqCount = 0;
+                _trainSurfaceCount = 0;
+
+                panel.classList.add('active');
+                btn.disabled = false;
+                btn.classList.add('highlight');
+                btn.style.background = 'rgba(124,58,237,0.2)';
+                btn.style.borderColor = 'rgba(124,58,237,0.5)';
+                btn.style.color = 'var(--accent-secondary)';
+                btn.innerHTML = '<i class="fas fa-stop"></i> Stop Training';
+
+                document.getElementById('trainingRecordingStatus').style.display = 'flex';
+                document.getElementById('trainingHint').textContent = 'Browse the target in Chrome — requests are being intercepted live';
+
+                // Clear intercept feed
+                document.getElementById('interceptFeed').innerHTML = '';
+                document.getElementById('surfaceSummary').innerHTML = '';
+
+                log('success', `Chrome launched — browse ${url} to discover attack surfaces`);
+                _startInterceptStream();
+
+            } catch (e) {
+                log('critical', 'Browser training error: ' + e.message);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Training Mode';
             }
+        }
+
+        async function stopBrowserTraining() {
+            const btn = document.getElementById('trainingToggle');
+            if (_trainingEventSource) { _trainingEventSource.close(); _trainingEventSource = null; }
+
+            try {
+                const resp = await fetch('/api/browser-training/stop', {method: 'POST'});
+                const summary = await resp.json();
+                trainingActive = false;
+                btn.classList.remove('highlight');
+                btn.style.background = '';
+                btn.style.borderColor = '';
+                btn.style.color = '';
+                btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Training Mode';
+                document.getElementById('trainingRecordingStatus').style.display = 'none';
+                document.getElementById('trainingHint').textContent = 'Session ended — click Auto-Scan to run targeted scan on discovered surfaces';
+                document.getElementById('applyTrainingBtn').style.display = '';
+
+                const top = (summary.top_attack_types || []).join(', ').toUpperCase() || '—';
+                log('success', `Browser training complete — ${summary.request_count||0} requests, ${summary.surface_count||0} surfaces, top: ${top}`);
+                _renderSurfaceSummary(summary.attack_surface_breakdown || {});
+            } catch (e) {
+                log('critical', 'Stop error: ' + e.message);
+            }
+        }
+
+        function _startInterceptStream() {
+            if (_trainingEventSource) _trainingEventSource.close();
+            _trainingEventSource = new EventSource(`/api/browser-training/stream?cursor=${_trainingCursor}`);
+
+            _trainingEventSource.onmessage = (e) => {
+                try {
+                    const payload = JSON.parse(e.data);
+                    _handleInterceptEvent(payload);
+                } catch (_) {}
+            };
+
+            // Handle named events from SSE
+            ['request','surface','log','done'].forEach(evtName => {
+                _trainingEventSource.addEventListener(evtName, (e) => {
+                    try {
+                        const payload = JSON.parse(e.data);
+                        _handleInterceptEvent({type: evtName, ...payload});
+                    } catch (_) {}
+                });
+            });
+
+            _trainingEventSource.onerror = () => {
+                if (trainingActive) {
+                    setTimeout(_startInterceptStream, 1000);
+                }
+            };
+        }
+
+        function _handleInterceptEvent(ev) {
+            const type = ev.type;
+            if (type === 'request') {
+                _trainReqCount++;
+                document.getElementById('trainRequests').textContent = _trainReqCount;
+                _addInterceptRow(ev, false);
+            } else if (type === 'surface') {
+                _trainSurfaceCount++;
+                _trainingSurfaces.push(ev);
+                document.getElementById('trainSurfaces').textContent = _trainSurfaceCount;
+                document.getElementById('trainParams').textContent = _trainSurfaceCount;
+                _addInterceptRow(ev, true);
+                // Update top type
+                const counts = {};
+                _trainingSurfaces.forEach(s => (s.attack_hints||[]).forEach(h => counts[h]=(counts[h]||0)+1));
+                const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+                if (top) document.getElementById('trainTopType').textContent = top[0].toUpperCase();
+                _renderSurfaceSummary(counts);
+            } else if (type === 'log') {
+                log(ev.level || 'info', '[Intercept] ' + ev.message);
+            } else if (type === 'done') {
+                if (_trainingEventSource) { _trainingEventSource.close(); _trainingEventSource = null; }
+            }
+        }
+
+        function _addInterceptRow(ev, isSurface) {
+            const feed = document.getElementById('interceptFeed');
+            const row = document.createElement('div');
+            const hints = ev.attack_hints || [];
+            const primaryHint = hints[0] || '';
+            row.className = 'intercept-row' + (isSurface ? ' surface ' + primaryHint : '');
+
+            const method = ev.method || 'GET';
+            const path = ev.path || ev.url || '';
+            const param = ev.parameter ? ` <span class="intercept-param">[${escapeHtml(ev.parameter)}]</span>` : '';
+
+            let badgesHtml = `<span class="intercept-badge badge-${method.toLowerCase()}">${method}</span>`;
+            hints.slice(0,3).forEach(h => {
+                badgesHtml += ` <span class="intercept-badge badge-${h}">${h.toUpperCase()}</span>`;
+            });
+
+            row.innerHTML = `${badgesHtml} <span class="intercept-path">${escapeHtml(path.substring(0,80))}${param}</span>`;
+            feed.appendChild(row);
+            feed.scrollTop = feed.scrollHeight;
+        }
+
+        function _renderSurfaceSummary(breakdown) {
+            const el = document.getElementById('surfaceSummary');
+            if (!breakdown || !Object.keys(breakdown).length) return;
+            el.innerHTML = Object.entries(breakdown)
+                .sort((a,b)=>b[1]-a[1])
+                .map(([type, count]) => {
+                    const color = ATTACK_COLORS[type] || 'var(--text-secondary)';
+                    return `<span class="surface-chip" style="background:${color}22;color:${color};border:1px solid ${color}55" onclick="selectAttackTypeFromTraining('${type}')">${type.toUpperCase()} <strong>${count}</strong></span>`;
+                }).join('');
+        }
+
+        function selectAttackTypeFromTraining(type) {
+            const checkboxes = document.querySelectorAll('.attack-type-checkbox');
+            checkboxes.forEach(cb => { if (cb.value === type) cb.checked = true; });
+            log('info', `Attack type ${type.toUpperCase()} selected from training discovery`);
+        }
+
+        function applyTrainingSurfaces() {
+            if (!_trainingSurfaces.length) { log('system', 'No surfaces discovered yet'); return; }
+            const counts = {};
+            _trainingSurfaces.forEach(s => (s.attack_hints||[]).forEach(h => counts[h]=(counts[h]||0)+1));
+            const topTypes = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,4);
+            topTypes.forEach(t => selectAttackTypeFromTraining(t));
+            log('success', `Auto-selected attack types from training: ${topTypes.map(t=>t.toUpperCase()).join(', ')}`);
+            log('info', 'Starting targeted scan based on discovered surfaces...');
+            startScan();
         }
         
         
@@ -1547,6 +1594,97 @@
         
         function escapeHtml(text){if(!text)return'';const d=document.createElement('div');d.textContent=text;return d.innerHTML}
         document.getElementById('targetUrl').addEventListener('keypress',e=>{if(e.key==='Enter'&&!isScanning)startScan()});
+
+        // Toast notifications with click-to-dismiss
+        function showToast(message, type='info', duration=3500) {
+            let container = document.getElementById('toastContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toastContainer';
+                container.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:99999;display:flex;flex-direction:column;gap:0.5rem;pointer-events:none';
+                document.body.appendChild(container);
+            }
+            const colors = {info:'var(--accent)',success:'var(--low)',error:'var(--critical)',warning:'var(--medium)'};
+            const icons = {info:'info-circle',success:'check-circle',error:'exclamation-circle',warning:'exclamation-triangle'};
+            const toast = document.createElement('div');
+            const c = colors[type] || colors.info;
+            toast.style.cssText = `pointer-events:all;background:rgba(10,10,15,0.95);border:1px solid ${c}40;border-left:3px solid ${c};border-radius:10px;padding:0.75rem 1rem;display:flex;align-items:center;gap:0.6rem;font-size:0.8rem;color:var(--text);backdrop-filter:blur(20px);box-shadow:0 8px 25px rgba(0,0,0,0.5);cursor:pointer;transition:opacity 0.3s;min-width:220px;max-width:360px`;
+            toast.innerHTML = `<i class="fas fa-${icons[type]||'info-circle'}" style="color:${c};font-size:0.9rem;flex-shrink:0"></i><span style="flex:1;line-height:1.3">${escapeHtml(message)}</span><i class="fas fa-times" style="color:var(--text-muted);font-size:0.7rem;flex-shrink:0"></i>`;
+            toast.onclick = () => { toast.style.opacity='0'; setTimeout(()=>toast.remove(),300); };
+            container.appendChild(toast);
+            setTimeout(()=>{ toast.style.opacity='0'; setTimeout(()=>toast.remove(),300); }, duration);
+        }
+
+        // Check Ollama/AI status on load and update header pill
+        async function checkAIStatus() {
+            try {
+                const r = await fetch('/api/ai-status');
+                if (!r.ok) return;
+                const d = await r.json();
+                const isUp = d.ollama_running === true;
+                const dot = document.getElementById('statusDot');
+                const txt = document.getElementById('statusText');
+                if (!isScanning) {
+                    if (dot) { dot.style.background = isUp ? 'var(--low)' : 'var(--high)'; }
+                    if (txt) txt.title = isUp ? 'AI model is running' : 'AI offline — rule-based fallback active';
+                }
+                // Show brief toast on load if offline
+                if (!isUp) showToast('AI model offline — using rule-based fallback', 'warning', 4000);
+            } catch(e) {}
+        }
+        window.addEventListener('load', checkAIStatus);
+
+        // Saved Scans (AES-256 encrypted)
+        async function showSavedScans() {
+            let modal = document.getElementById('savedScansModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'savedScansModal';
+                modal.className = 'modal-overlay';
+                modal.innerHTML = '<div class="modal" style="max-width:700px;background:linear-gradient(135deg,rgba(10,10,15,0.98),rgba(26,26,46,0.98));border:2px solid rgba(0,212,255,0.3);padding:2rem"><div class="modal-header"><h2 class="modal-title"><i class="fas fa-lock"></i> Encrypted Scan Results</h2><button class="modal-close" onclick="document.getElementById(\'savedScansModal\').classList.remove(\'active\')"><i class="fas fa-times"></i></button></div><div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:1rem;padding:0.5rem 0.75rem;background:rgba(0,212,255,0.05);border-radius:8px;border-left:3px solid var(--accent)"><i class="fas fa-shield-alt" style="color:var(--accent)"></i> Results are encrypted at rest using AES-256-GCM</div><div id="savedScansList" style="max-height:400px;overflow-y:auto"><div style="text-align:center;color:var(--text-muted);padding:2rem"><i class="fas fa-spinner fa-spin"></i> Loading...</div></div></div>';
+                document.body.appendChild(modal);
+            }
+            modal.classList.add('active');
+            try {
+                const res = await fetch('/api/saved-results');
+                const data = await res.json();
+                const list = document.getElementById('savedScansList');
+                if (!data.results || data.results.length === 0) {
+                    list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem">No saved scans yet. Complete a scan to save encrypted results.</div>';
+                    return;
+                }
+                list.innerHTML = data.results.map(r => {
+                    const sev = r.severity_breakdown || {};
+                    const date = r.timestamp ? new Date(r.timestamp).toLocaleString() : 'Unknown';
+                    const critHtml = sev.critical ? '<span style="color:var(--critical)">' + sev.critical + ' critical</span>' : '';
+                    const highHtml = sev.high ? '<span style="color:var(--high)">' + sev.high + ' high</span>' : '';
+                    return '<div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.9rem;margin-bottom:0.5rem;cursor:pointer;transition:all 0.2s" onclick="loadSavedScan(\''+r.scan_id+'\')"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem"><div style="font-family:JetBrains Mono,monospace;font-size:0.75rem;color:var(--accent);font-weight:600">'+escapeHtml(r.url||'Unknown target')+'</div><span style="font-size:0.65rem;color:var(--text-muted)">'+date+'</span></div><div style="display:flex;gap:0.75rem;font-size:0.7rem"><span style="color:var(--text-secondary)"><i class="fas fa-bug"></i> '+r.total_findings+' findings</span>'+critHtml+highHtml+'<span style="margin-left:auto;color:var(--low);font-size:0.65rem"><i class="fas fa-lock"></i> AES-256-GCM</span></div></div>';
+                }).join('');
+            } catch(e) {
+                document.getElementById('savedScansList').innerHTML = '<div style="color:var(--critical);padding:1rem">Error: '+e.message+'</div>';
+            }
+        }
+
+        async function loadSavedScan(scanId) {
+            try {
+                const res = await fetch('/api/saved-results/'+scanId);
+                const data = await res.json();
+                document.getElementById('savedScansModal').classList.remove('active');
+                findings = data.vulnerabilities || [];
+                sevCounts = {critical:0,high:0,medium:0,low:0};
+                findings.forEach(f => { const s=(f.severity||'low').toLowerCase(); if(sevCounts[s]!==undefined)sevCounts[s]++; });
+                updateSeverityCounts();
+                document.getElementById('statFindings').textContent = findings.length;
+                clearLogs();
+                log('system', 'Loaded encrypted scan: '+(data.url||''));
+                log('success', findings.length+' vulnerabilities decrypted and loaded');
+                if (findings.length > 0) showSummary();
+                showToast('Loaded '+findings.length+' findings from encrypted archive', 'success');
+            } catch(e) {
+                showToast('Failed to load scan: '+e.message, 'error');
+            }
+        }
+
     </script>
     
     <!-- Vulnerability Details Modal -->

@@ -109,6 +109,11 @@ Examples:
         default='0.0.0.0',
         help='Host to bind to'
     )
+    server_parser.add_argument(
+        '--rb',
+        action='store_true',
+        help='Rule-based only mode — disables AI model, instant responses'
+    )
     
     # Report command
     report_parser = subparsers.add_parser('report', help='Generate a report from last scan')
@@ -284,7 +289,7 @@ async def cmd_analyze(args, config):
 
 def cmd_server(args, config):
     """Execute server command."""
-    run_server(host=args.host, port=args.port, config=config)
+    run_server(host=args.host, port=args.port, config=config, rule_based_only=getattr(args, 'rb', False))
     return 0
 
 

