@@ -9,6 +9,8 @@ from typing import Dict, List, Optional, Any
 
 import aiohttp
 
+from .config import OLLAMA_URL, OLLAMA_MODEL
+
 SYSTEM_PROMPT = """You are a web application penetration tester. Analyze the given website data and return ONLY a JSON object.
 
 STRICT OUTPUT RULE: Output ONLY the JSON object. No markdown, no code fences, no explanation.
@@ -52,9 +54,6 @@ class AITargetAnalyzer:
     Analyzes target websites using AI to recommend attack types.
     """
 
-    OLLAMA_URL = "http://localhost:11434/api/generate"
-    OLLAMA_MODEL = "gemma4:31b-cloud"
-
     _MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
     _LORA_ADAPTER = "pennywise-lora-v2"
 
@@ -76,14 +75,12 @@ class AITargetAnalyzer:
             if not os.path.exists(self._lora_path):
                 raise FileNotFoundError(f"Local adapter not found at {self._lora_path}")
 
-            # Load tokenizer and adapter config only (no full model weights in memory)
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self._lora_path,
                 trust_remote_code=True,
                 local_files_only=True,
             )
             self._peft_config = PeftConfig.from_pretrained(self._lora_path)
-            # Full model inference is offloaded to Ollama relay for GPU efficiency
             self.model_available = True
         except Exception:
             self.model_available = False
@@ -156,8 +153,8 @@ HTML: {snippet_short}"""
                 timeout=aiohttp.ClientTimeout(total=180, connect=5)
             ) as session:
                 async with session.post(
-                    self.OLLAMA_URL,
-                    json={"model": self.OLLAMA_MODEL, "prompt": prompt, "stream": False},
+                    OLLAMA_URL,
+                    json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
                 ) as resp:
                     raw_text = await resp.text()
                     if resp.status != 200:

@@ -1092,9 +1092,12 @@ class PennywiseAPI:
             
             # Run scan
             result = await streaming_scanner.scan(url=url, attack_types=attack_types, crawl=crawl, max_pages=50)
-            
-            # Send completion - handle dict result from EnhancedScanner
-            findings_list = result.get('findings', []) if isinstance(result, dict) else result.findings
+
+            # findings_list was populated live by on_finding callback — don't overwrite it
+            # fall back to result dict only if callback collected nothing
+            if not findings_list:
+                findings_list = result.get('findings', []) if isinstance(result, dict) else getattr(result, 'findings', [])
+
             severity_breakdown = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
             for f in findings_list:
                 if isinstance(f, dict):
@@ -1113,7 +1116,32 @@ class PennywiseAPI:
                 result['severity_breakdown'] = severity_breakdown
             self.current_result = result
             
+            import uuid
+            scan_id = str(uuid.uuid4())[:8]
+            # Normalise findings to plain dicts
+            norm_findings = []
+            for f in findings_list:
+                if isinstance(f, dict):
+                    norm_findings.append(f)
+                else:
+                    norm_findings.append({
+                        'title': getattr(f, 'title', str(f)),
+                        'severity': f.severity.value if hasattr(f, 'severity') else 'info',
+                        'type': f.attack_type.value if hasattr(f, 'attack_type') else '',
+                        'url': getattr(f, 'url', ''),
+                        'parameter': getattr(f, 'parameter', ''),
+                        'payload': getattr(f, 'payload', ''),
+                        'evidence': getattr(f, 'evidence', ''),
+                    })
+            self._save_encrypted_result(scan_id, {
+                'url': url,
+                'result': {'findings': norm_findings},
+                'vulnerabilities': len(norm_findings),
+                'severity_breakdown': severity_breakdown,
+            })
+
             await self._send_sse(response, 'complete', {
+                'scan_id': scan_id,
                 'result': {
                     'pages_scanned': pages,
                     'requests_made': requests,
@@ -1122,10 +1150,10 @@ class PennywiseAPI:
                 },
                 'severity_breakdown': severity_breakdown
             })
-            
+
             await response.write_eof()
             return response
-            
+
         except Exception as e:
             self.logger.error(f"Stream scan failed: {e}")
             if 'response' in locals():
@@ -1233,8 +1261,9 @@ class PennywiseAPI:
             # Run scan with sandbox path
             result = await streaming_scanner.scan(url=sandbox_url, attack_types=attack_types, crawl=True, max_pages=30)
             
-            # Send completion - handle dict result from EnhancedScanner
-            findings_list = result.get('findings', []) if isinstance(result, dict) else result.findings
+            if not findings_list:
+                findings_list = result.get('findings', []) if isinstance(result, dict) else getattr(result, 'findings', [])
+
             severity_breakdown = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
             for f in findings_list:
                 if isinstance(f, dict):

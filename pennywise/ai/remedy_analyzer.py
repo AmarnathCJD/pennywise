@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Any
 
 import aiohttp
 
+from .config import OLLAMA_URL, OLLAMA_MODEL
 
 REMEDY_SYSTEM_PROMPT = """You are a web application security expert. Given the specific vulnerability finding below, return ONLY a JSON object with targeted remediation guidance.
 
@@ -36,15 +37,13 @@ class AIRemedyAnalyzer:
     Generates remediation reports using AI to recommend security fixes.
     """
 
-    OLLAMA_URL = "http://localhost:11434/api/generate"
-    OLLAMA_MODEL = "gemma4:31b-cloud"
     _MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
     _LORA_ADAPTER = "pennywise-lora-remedy-v1"
 
     def __init__(self):
         self.model = None
         self.tokenizer = None
-        self._lora_path = "./lora/remedy/lora-adapter"
+        self._lora_path = "./lora/analyser/lora-adapter"
         self._load_model()
 
     def _load_model(self):
@@ -57,14 +56,12 @@ class AIRemedyAnalyzer:
             if not os.path.exists(self._lora_path):
                 raise FileNotFoundError(f"Local adapter not found at {self._lora_path}")
 
-            # Load tokenizer and adapter config only (no full model weights in memory)
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self._lora_path,
                 trust_remote_code=True,
                 local_files_only=True,
             )
             self._peft_config = PeftConfig.from_pretrained(self._lora_path)
-            # Full model inference is offloaded to Ollama relay for GPU efficiency
         except Exception:
             pass
 
@@ -113,8 +110,8 @@ class AIRemedyAnalyzer:
                 timeout=aiohttp.ClientTimeout(total=180, connect=5)
             ) as session:
                 async with session.post(
-                    self.OLLAMA_URL,
-                    json={"model": self.OLLAMA_MODEL, "prompt": prompt, "stream": False},
+                    OLLAMA_URL,
+                    json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
                 ) as resp:
                     raw_text = await resp.text()
                     if resp.status != 200:

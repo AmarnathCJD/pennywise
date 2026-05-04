@@ -1,10 +1,9 @@
 """
 Browser-based training mode.
-Opens a Chrome browser via Selenium Wire, intercepts all network requests
-in real-time, and streams them to the dashboard as attack surfaces.
+Opens Chrome via Selenium with CDP network logging, intercepts all network
+requests in real-time, and streams them to the dashboard as attack surfaces.
 """
 
-import asyncio
 import json
 import threading
 import time
@@ -14,51 +13,36 @@ from urllib.parse import urlparse, parse_qs
 
 
 class BrowserTrainer:
-    """
-    Opens Chrome with request interception. Streams discovered endpoints,
-    parameters, forms, and request bodies back to the dashboard in real-time.
-    """
-
     def __init__(self, on_request: Callable, on_log: Callable, on_surface: Callable):
-        self.on_request = on_request   # called for every intercepted request
-        self.on_log = on_log           # called for log messages
-        self.on_surface = on_surface   # called when attack surface is found
+        self.on_request = on_request
+        self.on_log = on_log
+        self.on_surface = on_surface
         self.driver = None
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self.surfaces = []             # discovered attack surfaces
+        self.surfaces = []
         self.request_count = 0
-        self.session_id = None
 
     def start(self, url: str = "about:blank") -> bool:
-        """Launch Chrome with request interception."""
         try:
-            from seleniumwire import webdriver as sw_webdriver
+            from selenium import webdriver
             from selenium.webdriver.chrome.options import Options
-            from webdriver_manager.chrome import ChromeDriverManager
             from selenium.webdriver.chrome.service import Service
+            from webdriver_manager.chrome import ChromeDriverManager
 
             options = Options()
             options.add_argument("--start-maximized")
             options.add_argument("--disable-blink-features=AutomationControlled")
             options.add_experimental_option("excludeSwitches", ["enable-automation"])
             options.add_experimental_option("useAutomationExtension", False)
-
-            sw_options = {
-                "suppress_connection_errors": True,
-                "verify_ssl": False,
-            }
+            options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
             service = Service(ChromeDriverManager().install())
-            self.driver = sw_webdriver.Chrome(
-                service=service,
-                options=options,
-                seleniumwire_options=sw_options,
-            )
-            # Remove automation fingerprint
+            self.driver = webdriver.Chrome(service=service, options=options)
             self.driver.execute_script(
                 "Object.defineProperty(navigator,'webdriver',{get:()=>undefined})"
             )
+            self.driver.execute_cdp_cmd("Network.enable", {})
 
             if url and url != "about:blank":
                 self.driver.get(url)
@@ -68,7 +52,7 @@ class BrowserTrainer:
             self._thread.start()
 
             self.on_log("Chrome browser launched — browse the target site", "success")
-            self.on_log("All network requests are being intercepted", "info")
+            self.on_log("All network requests are being intercepted via CDP", "info")
             return True
 
         except Exception as e:
@@ -76,7 +60,6 @@ class BrowserTrainer:
             return False
 
     def stop(self):
-        """Stop interception and close the browser."""
         self._running = False
         if self.driver:
             try:
@@ -91,111 +74,107 @@ class BrowserTrainer:
         )
 
     def _intercept_loop(self):
-        """Background thread — polls for new requests from selenium-wire."""
-        seen = set()
+        seen_ids = set()
         while self._running:
             try:
                 if not self.driver:
                     break
-                requests = self.driver.requests
-                for req in requests:
-                    rid = id(req)
-                    if rid in seen:
-                        continue
-                    seen.add(rid)
-                    self._process_request(req)
+                logs = self.driver.get_log("performance")
+                for entry in logs:
+                    try:
+                        msg = json.loads(entry["message"])["message"]
+                        if msg.get("method") != "Network.requestWillBeSent":
+                            continue
+                        params = msg.get("params", {})
+                        req_id = params.get("requestId", "")
+                        if req_id in seen_ids:
+                            continue
+                        seen_ids.add(req_id)
+                        self._process_request(params)
+                    except Exception:
+                        pass
             except Exception:
                 pass
             time.sleep(0.3)
 
-    def _process_request(self, req):
-        """Analyse an intercepted request for attack surfaces."""
+    def _process_request(self, params: dict):
         try:
-            url = req.url
-            method = req.method
-            headers = dict(req.headers) if req.headers else {}
-            body = req.body.decode("utf-8", errors="ignore") if req.body else ""
+            req = params.get("request", {})
+            url = req.get("url", "")
+            method = req.get("method", "GET")
+            headers = req.get("headers", {})
+            body = req.get("postData", "")
 
-            self.request_count += 1
+            if not url.startswith("http"):
+                return
 
             parsed = urlparse(url)
             host = parsed.netloc
             path = parsed.path
 
-            # Skip noise
-            if any(
-                ext in path.lower()
-                for ext in [".png", ".jpg", ".gif", ".ico", ".woff", ".css", ".svg", ".mp4"]
-            ):
+            if any(ext in path.lower() for ext in [
+                ".png", ".jpg", ".gif", ".ico", ".woff", ".css", ".svg", ".mp4", ".webp", ".ttf"
+            ]):
                 return
-            if any(
-                domain in host
-                for domain in ["google-analytics", "googletagmanager", "facebook", "doubleclick", "cdn"]
-            ):
+            if any(d in host for d in [
+                "google-analytics", "googletagmanager", "facebook", "doubleclick", "cdn"
+            ]):
                 return
 
+            self.request_count += 1
             surfaces_found = []
 
-            # URL query parameters
             query_params = parse_qs(parsed.query)
-            if query_params:
-                for param, values in query_params.items():
-                    surface = {
-                        "type": "url_param",
-                        "url": url,
-                        "parameter": param,
-                        "value": values[0] if values else "",
-                        "method": method,
-                        "attack_hints": self._guess_attack_types(param, values[0] if values else ""),
-                    }
-                    surfaces_found.append(surface)
+            for param, values in query_params.items():
+                surfaces_found.append({
+                    "type": "url_param",
+                    "url": url,
+                    "parameter": param,
+                    "value": values[0] if values else "",
+                    "method": method,
+                    "attack_hints": self._guess_attack_types(param, values[0] if values else ""),
+                })
 
-            # POST body parameters
             if method == "POST" and body:
-                # Try form-encoded
-                if "application/x-www-form-urlencoded" in headers.get("Content-Type", ""):
-                    post_params = parse_qs(body)
-                    for param, values in post_params.items():
-                        surface = {
+                content_type = headers.get("Content-Type", headers.get("content-type", ""))
+                if "application/x-www-form-urlencoded" in content_type:
+                    for param, values in parse_qs(body).items():
+                        surfaces_found.append({
                             "type": "post_param",
                             "url": url,
                             "parameter": param,
                             "value": values[0] if values else "",
                             "method": "POST",
                             "attack_hints": self._guess_attack_types(param, values[0] if values else ""),
-                        }
-                        surfaces_found.append(surface)
-                # Try JSON body
-                elif "application/json" in headers.get("Content-Type", ""):
+                        })
+                elif "application/json" in content_type:
                     try:
                         json_body = json.loads(body)
                         if isinstance(json_body, dict):
                             for param, value in json_body.items():
-                                surface = {
+                                surfaces_found.append({
                                     "type": "json_param",
                                     "url": url,
                                     "parameter": param,
                                     "value": str(value)[:100],
                                     "method": "POST",
                                     "attack_hints": self._guess_attack_types(param, str(value)),
-                                }
-                                surfaces_found.append(surface)
+                                })
                     except Exception:
                         pass
 
-            # Auth headers
-            if "Authorization" in headers:
+            auth = headers.get("Authorization", headers.get("authorization", ""))
+            if auth:
                 surfaces_found.append({
                     "type": "auth_header",
                     "url": url,
                     "parameter": "Authorization",
-                    "value": headers["Authorization"][:40] + "...",
+                    "value": auth[:40] + "...",
                     "method": method,
                     "attack_hints": ["auth"],
                 })
 
-            # Fire callbacks
-            request_info = {
+            self.on_request({
                 "url": url,
                 "method": method,
                 "host": host,
@@ -203,70 +182,52 @@ class BrowserTrainer:
                 "has_params": bool(query_params or (method == "POST" and body)),
                 "surfaces": len(surfaces_found),
                 "timestamp": datetime.now().isoformat(),
-            }
-            self.on_request(request_info)
+            })
 
             for surface in surfaces_found:
                 self.surfaces.append(surface)
                 self.on_surface(surface)
 
-            # Log interesting ones
             if surfaces_found:
                 hints = list(set(h for s in surfaces_found for h in s.get("attack_hints", [])))
                 self.on_log(
-                    f"[{method}] {path} — {len(surfaces_found)} param(s) found, "
+                    f"[{method}] {path} — {len(surfaces_found)} param(s), "
                     f"possible: {', '.join(hints).upper() if hints else 'unknown'}",
-                    "warning" if hints else "info",
+                    "warning",
                 )
-            elif method in ("GET", "POST") and path != "/":
+            elif method in ("GET", "POST") and path not in ("/", ""):
                 self.on_log(f"[{method}] {url[:80]}", "url")
 
-        except Exception as e:
-            pass  # silently skip malformed requests
+        except Exception:
+            pass
 
     def _guess_attack_types(self, param: str, value: str) -> list:
-        """Heuristically guess which attack types a parameter might be vulnerable to."""
         hints = []
-        param_l = param.lower()
-        value_l = value.lower()
+        p = param.lower()
+        v = value.lower()
 
-        sqli_params = ["id", "uid", "user_id", "pid", "cat", "category", "search", "q", "query",
-                       "filter", "sort", "order", "page", "limit", "offset", "item", "product"]
-        xss_params = ["name", "search", "q", "query", "msg", "message", "comment", "text",
-                      "title", "content", "description", "input", "data", "value", "email"]
-        redirect_params = ["redirect", "return", "url", "next", "goto", "dest", "destination",
-                           "continue", "callback", "redir", "forward", "location"]
-        file_params = ["file", "path", "page", "include", "load", "template", "view",
-                       "doc", "document", "upload", "filename", "attachment"]
-        ssrf_params = ["url", "uri", "link", "src", "source", "fetch", "load", "request",
-                       "proxy", "target", "host", "endpoint", "api", "webhook"]
-        idor_params = ["id", "uid", "user_id", "account", "profile", "order", "invoice",
-                       "ticket", "record", "item_id", "post_id", "doc_id"]
-
-        if any(p in param_l for p in sqli_params) or value_l.isdigit():
+        if any(x in p for x in ["id", "uid", "user_id", "pid", "cat", "search", "q", "query", "filter", "sort", "order", "page", "item"]) or v.isdigit():
             hints.append("sqli")
-        if any(p in param_l for p in xss_params):
+        if any(x in p for x in ["name", "search", "q", "query", "msg", "message", "comment", "text", "title", "content", "input", "data", "value", "email"]):
             hints.append("xss")
-        if any(p in param_l for p in redirect_params):
+        if any(x in p for x in ["redirect", "return", "url", "next", "goto", "dest", "continue", "callback", "redir", "forward"]):
             hints.append("open_redirect")
-        if any(p in param_l for p in file_params):
+        if any(x in p for x in ["file", "path", "page", "include", "load", "template", "view", "doc", "filename"]):
             hints.append("lfi")
-        if any(p in param_l for p in ssrf_params):
+        if any(x in p for x in ["url", "uri", "link", "src", "source", "fetch", "proxy", "target", "host", "endpoint", "webhook"]):
             hints.append("ssrf")
-        if any(p in param_l for p in idor_params) and value_l.isdigit():
+        if any(x in p for x in ["id", "uid", "user_id", "account", "order", "invoice", "ticket", "record"]) and v.isdigit():
             hints.append("idor")
         if not hints:
-            hints.append("xss")  # default — most params are XSS candidates
+            hints.append("xss")
 
         return list(set(hints))
 
     def get_summary(self) -> dict:
-        """Return a summary of discovered attack surfaces."""
         by_type = {}
         for s in self.surfaces:
-            for hint in s.get("attack_hints", []):
-                by_type[hint] = by_type.get(hint, 0) + 1
-
+            for h in s.get("attack_hints", []):
+                by_type[h] = by_type.get(h, 0) + 1
         return {
             "request_count": self.request_count,
             "surface_count": len(self.surfaces),

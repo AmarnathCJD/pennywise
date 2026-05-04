@@ -362,6 +362,7 @@
                 <button class="quick-btn" id="trainingToggle" onclick="toggleTraining()"><i class="fas fa-graduation-cap"></i> Training Mode</button>
                 <button class="quick-btn" onclick="clearLogs()"><i class="fas fa-trash-can"></i> Clear</button>
                 <button class="quick-btn" onclick="exportResults()"><i class="fas fa-file-export"></i> Export</button>
+                <button class="quick-btn" id="saveScanBtn" onclick="saveScan()" style="display:none"><i class="fas fa-floppy-disk"></i> Save Scan</button>
                 <button class="quick-btn" onclick="showSavedScans()"><i class="fas fa-lock"></i> Saved Scans</button>
             </div>
         </div>
@@ -659,6 +660,10 @@
                         const requests = result.requests_made || 0;
                         const duration = result.scan_duration || result.duration_seconds || 0;
                         updateStats(pages, requests, findings.length, duration);
+                        if (data.scan_id) {
+                            currentScanInfo.saved_scan_id = data.scan_id;
+                            document.getElementById('saveScanBtn').style.display = '';
+                        }
                         eventSource.close();
                         setScanning(false);
                         showSummary();
@@ -725,6 +730,10 @@
                         const requests = result.requests_made || 0;
                         const duration = result.scan_duration || result.duration_seconds || 0;
                         updateStats(pages, requests, findings.length, duration);
+                        if (data.scan_id) {
+                            currentScanInfo.saved_scan_id = data.scan_id;
+                            document.getElementById('saveScanBtn').style.display = '';
+                        }
                         eventSource.close();
                         setScanning(false);
                         showSummary();
@@ -1453,24 +1462,35 @@
             const btn = document.getElementById('trainingToggle');
             if (_trainingEventSource) { _trainingEventSource.close(); _trainingEventSource = null; }
 
+            trainingActive = false;
+            btn.classList.remove('highlight');
+            btn.style.background = '';
+            btn.style.borderColor = '';
+            btn.style.color = '';
+            btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Training Mode';
+            document.getElementById('trainingRecordingStatus').style.display = 'none';
+            document.getElementById('trainingHint').textContent = 'Session ended — click Auto-Scan to run targeted scan on discovered surfaces';
+            document.getElementById('applyTrainingBtn').style.display = '';
+
             try {
                 const resp = await fetch('/api/browser-training/stop', {method: 'POST'});
-                const summary = await resp.json();
-                trainingActive = false;
-                btn.classList.remove('highlight');
-                btn.style.background = '';
-                btn.style.borderColor = '';
-                btn.style.color = '';
-                btn.innerHTML = '<i class="fas fa-graduation-cap"></i> Training Mode';
-                document.getElementById('trainingRecordingStatus').style.display = 'none';
-                document.getElementById('trainingHint').textContent = 'Session ended — click Auto-Scan to run targeted scan on discovered surfaces';
-                document.getElementById('applyTrainingBtn').style.display = '';
-
-                const top = (summary.top_attack_types || []).join(', ').toUpperCase() || '—';
-                log('success', `Browser training complete — ${summary.request_count||0} requests, ${summary.surface_count||0} surfaces, top: ${top}`);
-                _renderSurfaceSummary(summary.attack_surface_breakdown || {});
+                if (resp.ok) {
+                    const summary = await resp.json();
+                    const top = (summary.top_attack_types || []).join(', ').toUpperCase() || '—';
+                    log('success', `Browser training complete — ${summary.request_count||0} requests, ${summary.surface_count||0} surfaces, top: ${top}`);
+                    _renderSurfaceSummary(summary.attack_surface_breakdown || {});
+                } else {
+                    // Use locally collected data if server has no session
+                    const counts = {};
+                    _trainingSurfaces.forEach(s => (s.attack_hints||[]).forEach(h => counts[h]=(counts[h]||0)+1));
+                    log('success', `Browser training complete — ${_trainReqCount} requests, ${_trainingSurfaces.length} surfaces`);
+                    _renderSurfaceSummary(counts);
+                }
             } catch (e) {
-                log('critical', 'Stop error: ' + e.message);
+                const counts = {};
+                _trainingSurfaces.forEach(s => (s.attack_hints||[]).forEach(h => counts[h]=(counts[h]||0)+1));
+                log('success', `Browser training complete — ${_trainingSurfaces.length} surfaces discovered`);
+                _renderSurfaceSummary(counts);
             }
         }
 
@@ -1560,19 +1580,23 @@
         }
 
         function selectAttackTypeFromTraining(type) {
-            const checkboxes = document.querySelectorAll('.attack-type-checkbox');
-            checkboxes.forEach(cb => { if (cb.value === type) cb.checked = true; });
-            log('info', `Attack type ${type.toUpperCase()} selected from training discovery`);
+            // attack types are .option-tag[data-type] toggle buttons
+            document.querySelectorAll('.option-tag[data-type]').forEach(el => {
+                if (el.dataset.type === type) el.classList.add('active');
+            });
         }
 
         function applyTrainingSurfaces() {
-            if (!_trainingSurfaces.length) { log('system', 'No surfaces discovered yet'); return; }
             const counts = {};
             _trainingSurfaces.forEach(s => (s.attack_hints||[]).forEach(h => counts[h]=(counts[h]||0)+1));
             const topTypes = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,4);
+            if (!topTypes.length) { log('system', 'No attack surfaces discovered — browse the target first'); return; }
+            // Deactivate all first, then activate discovered types
+            document.querySelectorAll('.option-tag[data-type]').forEach(el => el.classList.remove('active'));
             topTypes.forEach(t => selectAttackTypeFromTraining(t));
-            log('success', `Auto-selected attack types from training: ${topTypes.map(t=>t.toUpperCase()).join(', ')}`);
-            log('info', 'Starting targeted scan based on discovered surfaces...');
+            log('success', `Auto-selected: ${topTypes.map(t=>t.toUpperCase()).join(', ')}`);
+            // Close training panel and start scan
+            document.getElementById('trainingPanel').classList.remove('active');
             startScan();
         }
         
@@ -1635,6 +1659,31 @@
         window.addEventListener('load', checkAIStatus);
 
         // Saved Scans (AES-256 encrypted)
+        async function saveScan() {
+            const scanId = currentScanInfo.saved_scan_id;
+            if (!scanId) { log('system', 'No completed scan to save'); return; }
+            const btn = document.getElementById('saveScanBtn');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            btn.disabled = true;
+            // Scan is already auto-saved on completion — just confirm to the user
+            try {
+                const res = await fetch('/api/saved-results/' + scanId);
+                if (res.ok) {
+                    btn.innerHTML = '<i class="fas fa-check"></i> Saved';
+                    btn.style.color = 'var(--low)';
+                    btn.style.borderColor = 'var(--low)';
+                    log('success', `Scan saved (AES-256-GCM encrypted) — ID: ${scanId}`);
+                } else {
+                    btn.innerHTML = '<i class="fas fa-floppy-disk"></i> Save Scan';
+                    btn.disabled = false;
+                    log('critical', 'Save failed — try again');
+                }
+            } catch(e) {
+                btn.innerHTML = '<i class="fas fa-floppy-disk"></i> Save Scan';
+                btn.disabled = false;
+            }
+        }
+
         async function showSavedScans() {
             let modal = document.getElementById('savedScansModal');
             if (!modal) {
